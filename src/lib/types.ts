@@ -31,6 +31,7 @@ export interface Group {
   id: string;
   name: string;
   is_protected?: boolean;
+  is_no_internet?: boolean;
   created_at: string;
   updated_at: string;
 }

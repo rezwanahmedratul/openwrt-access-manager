@@ -121,30 +121,41 @@ config rule
     option dest 'lan'
     option dest_port '500'
     option proto 'udp'
-    option target 'ACCEPT'
-
-config rule
-    option name 'Allow Internet Access'
-    option src 'lan'
-    option dest 'wan'
     option target 'ACCEPT'`;
 
 export interface UserConfigInput {
   name: string;
   mac_address: string;
+  is_no_internet?: boolean;
 }
 
 /**
- * Deterministically generates firewall configuration
+ * Deterministically generates firewall configuration.
+ * Groups with the 'no internet' tag have their member MAC addresses placed
+ * in a dedicated 'Block No-Internet Access' firewall rule (target REJECT),
+ * while permitted users are placed in 'Allow Internet Access' (target ACCEPT).
  * Users sorted by MAC address for complete reproducibility.
  */
 export function generateFirewallConfig(users: UserConfigInput[]): string {
-  // Sort deterministically by MAC address
-  const sorted = [...users].sort((a, b) => a.mac_address.localeCompare(b.mac_address));
+  const allowed = users.filter((u) => !u.is_no_internet);
+  const blocked = users.filter((u) => Boolean(u.is_no_internet));
+
+  const sortedAllowed = [...allowed].sort((a, b) => a.mac_address.localeCompare(b.mac_address));
+  const sortedBlocked = [...blocked].sort((a, b) => a.mac_address.localeCompare(b.mac_address));
 
   let config = FIREWALL_BASE_TEMPLATE;
 
-  for (const user of sorted) {
+  // Dedicated firewall rule to block internet access for no-internet users
+  if (sortedBlocked.length > 0) {
+    config += `\n\nconfig rule\n    option name 'Block No-Internet Access'\n    option src 'lan'\n    option dest 'wan'\n    option target 'REJECT'`;
+    for (const user of sortedBlocked) {
+      config += `\n    list src_mac '${user.mac_address}'`;
+    }
+  }
+
+  // Allowed internet access rule
+  config += `\n\nconfig rule\n    option name 'Allow Internet Access'\n    option src 'lan'\n    option dest 'wan'\n    option target 'ACCEPT'`;
+  for (const user of sortedAllowed) {
     config += `\n    list src_mac '${user.mac_address}'`;
   }
 

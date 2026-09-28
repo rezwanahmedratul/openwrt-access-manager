@@ -30,14 +30,29 @@ export async function GET(request: Request) {
       .maybeSingle();
 
     if (!config) {
-      const { data: users } = await supabase.from('users').select('name, mac_address');
-      content = generateFirewallConfig(users || []);
+      const { data: users } = await supabase
+        .from('users')
+        .select('name, mac_address, user_groups ( groups ( is_no_internet ) )');
+      const mapped = (users || []).map((u: any) => ({
+        name: u.name,
+        mac_address: u.mac_address,
+        is_no_internet: Boolean(u.user_groups?.some((ug: any) => ug.groups?.is_no_internet)),
+      }));
+      content = generateFirewallConfig(mapped);
     } else {
       content = config.firewall_content;
     }
   } else {
     const state = getMockState();
-    content = generateFirewallConfig(state.mockUsers);
+    const mapped = state.mockUsers.map((u) => {
+      const uGroups = u.groups.map((ug) => state.mockGroups.find((mg) => mg.id === ug.id) || ug);
+      return {
+        name: u.name,
+        mac_address: u.mac_address,
+        is_no_internet: Boolean(uGroups.some((g) => g.is_no_internet)),
+      };
+    });
+    content = generateFirewallConfig(mapped);
   }
 
   return new Response(content, {

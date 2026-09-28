@@ -50,13 +50,13 @@ let mockUsers: UserWithGroups[] = [
 ];
 
 let mockGroups: Group[] = [
-  { id: 'g-default', name: 'Default', is_protected: false, created_at: '', updated_at: '' },
-  { id: 'g1', name: 'Family', is_protected: false, created_at: '', updated_at: '' },
-  { id: 'g2', name: 'Friends', is_protected: false, created_at: '', updated_at: '' },
-  { id: 'g3', name: 'Students', is_protected: false, created_at: '', updated_at: '' },
-  { id: 'g4', name: 'Guests', is_protected: false, created_at: '', updated_at: '' },
-  { id: 'g5', name: 'Devices', is_protected: true, created_at: '', updated_at: '' },
-  { id: 'g6', name: 'Others', is_protected: false, created_at: '', updated_at: '' },
+  { id: 'g-default', name: 'Default', is_protected: false, is_no_internet: false, created_at: '', updated_at: '' },
+  { id: 'g1', name: 'Family', is_protected: false, is_no_internet: false, created_at: '', updated_at: '' },
+  { id: 'g2', name: 'Friends', is_protected: false, is_no_internet: false, created_at: '', updated_at: '' },
+  { id: 'g3', name: 'Students', is_protected: false, is_no_internet: false, created_at: '', updated_at: '' },
+  { id: 'g4', name: 'Guests', is_protected: false, is_no_internet: false, created_at: '', updated_at: '' },
+  { id: 'g5', name: 'Devices', is_protected: true, is_no_internet: false, created_at: '', updated_at: '' },
+  { id: 'g6', name: 'Others', is_protected: false, is_no_internet: false, created_at: '', updated_at: '' },
 ];
 
 let mockDraftChanges: DraftChange[] = [];

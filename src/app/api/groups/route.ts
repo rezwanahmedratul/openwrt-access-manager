@@ -28,7 +28,7 @@ export async function POST(request: Request) {
   try {
     const session = getSessionFromRequest(request);
     const body = await request.json();
-    const { name, is_protected } = body;
+    const { name, is_protected, is_no_internet } = body;
 
     if (!name || typeof name !== 'string' || !name.trim()) {
       return NextResponse.json({ error: 'Group name is required' }, { status: 400 });
@@ -36,10 +36,15 @@ export async function POST(request: Request) {
 
     const trimmedName = name.trim();
     const shouldProtect = Boolean(is_protected);
+    const shouldNoInternet = Boolean(is_no_internet);
 
-    // Only admin can create protected groups
-    if (shouldProtect && session && session.role !== 'admin') {
-      return NextResponse.json({ error: 'Only administrators can create protected groups.' }, { status: 403 });
+    if (shouldProtect && shouldNoInternet) {
+      return NextResponse.json({ error: 'A group cannot be both Protected and No Internet.' }, { status: 400 });
+    }
+
+    // Only admin can create protected or no internet groups
+    if ((shouldProtect || shouldNoInternet) && session && session.role !== 'admin') {
+      return NextResponse.json({ error: 'Only administrators can create protected or No Internet groups.' }, { status: 403 });
     }
 
     const supabase = getServiceSupabase();
@@ -61,7 +66,7 @@ export async function POST(request: Request) {
 
       const { data, error } = await supabase
         .from('groups')
-        .insert({ name: trimmedName, is_protected: shouldProtect })
+        .insert({ name: trimmedName, is_protected: shouldProtect, is_no_internet: shouldNoInternet })
         .select()
         .single();
 
@@ -83,6 +88,7 @@ export async function POST(request: Request) {
         id: 'group-' + Date.now(),
         name: trimmedName,
         is_protected: shouldProtect,
+        is_no_internet: shouldNoInternet,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
@@ -251,19 +257,27 @@ export async function DELETE(request: Request) {
   }
 }
 
-// PATCH toggle group protection or rename (Admin only for protected groups)
+// PATCH toggle group protection, no-internet, or rename
 export async function PATCH(request: Request) {
   try {
     const session = getSessionFromRequest(request);
     const body = await request.json();
-    const { id, is_protected, name } = body;
+    const { id, is_protected, is_no_internet, name, conflict_action } = body;
 
     if (!id) {
       return NextResponse.json({ error: 'Group ID is required' }, { status: 400 });
     }
 
-    if (is_protected !== undefined && session && session.role !== 'admin') {
-      return NextResponse.json({ error: 'Only administrators can change group protection status.' }, { status: 403 });
+    // Role check: Only admin can toggle protection or no_internet status
+    if (
+      (is_protected !== undefined || is_no_internet !== undefined) &&
+      session &&
+      session.role !== 'admin'
+    ) {
+      return NextResponse.json(
+        { error: 'Only administrators can change group protection or No Internet status.' },
+        { status: 403 }
+      );
     }
 
     const supabase = getServiceSupabase();
@@ -272,8 +286,112 @@ export async function PATCH(request: Request) {
     );
 
     if (isSupabaseConfigured) {
+      // 1. Fetch current group
+      const { data: currentGroup, error: fetchErr } = await supabase
+        .from('groups')
+        .select('*')
+        .eq('id', id)
+        .maybeSingle();
+
+      if (fetchErr) return NextResponse.json({ error: fetchErr.message }, { status: 500 });
+      if (!currentGroup) return NextResponse.json({ error: 'Group not found' }, { status: 404 });
+
+      // Incompatibility: cannot be both Protected and No Internet
+      if (is_protected === true && (currentGroup.is_no_internet || is_no_internet === true)) {
+        return NextResponse.json(
+          { error: 'A group cannot be both Protected and No Internet.' },
+          { status: 400 }
+        );
+      }
+      if (is_no_internet === true && (currentGroup.is_protected || is_protected === true)) {
+        return NextResponse.json(
+          { error: 'A group cannot be both Protected and No Internet.' },
+          { status: 400 }
+        );
+      }
+
+      // If enabling No Internet, check member conflicts
+      if (is_no_internet === true) {
+        const { data: memberLinks } = await supabase
+          .from('user_groups')
+          .select('user_id')
+          .eq('group_id', id);
+
+        const userIds = (memberLinks || []).map((ul: any) => ul.user_id);
+
+        if (userIds.length > 0) {
+          const { data: members } = await supabase
+            .from('users')
+            .select(`
+              id, name, mac_address,
+              user_groups (
+                groups ( id, name, is_protected, is_no_internet )
+              )
+            `)
+            .in('id', userIds);
+
+          // Check if any member is in a protected group
+          for (const m of members || []) {
+            const allGroups = (m.user_groups || []).map((ug: any) => ug.groups).filter(Boolean);
+            const protG = allGroups.find((g: any) => g.is_protected);
+            if (protG) {
+              return NextResponse.json(
+                {
+                  error: `Cannot tag group as No Internet: Member "${m.name}" is currently in protected group "${protG.name}". Administrator must remove the user from the protected group first.`,
+                  protected_conflict: true,
+                },
+                { status: 400 }
+              );
+            }
+          }
+
+          // Check multi-group conflicts (member also belongs to other internet-enabled groups)
+          const conflicts: { userId: string; userName: string; mac: string; otherGroups: string[] }[] = [];
+          for (const m of members || []) {
+            const allGroups = (m.user_groups || []).map((ug: any) => ug.groups).filter(Boolean);
+            const otherGs = allGroups.filter((g: any) => g.id !== id && !g.is_no_internet);
+            if (otherGs.length > 0) {
+              conflicts.push({
+                userId: m.id,
+                userName: m.name,
+                mac: m.mac_address,
+                otherGroups: otherGs.map((g: any) => g.name),
+              });
+            }
+          }
+
+          if (conflicts.length > 0) {
+            const conflictUserIds = conflicts.map((c) => c.userId);
+
+            if (conflict_action === 'force_add') {
+              // Remove conflicting users from all other groups
+              await supabase
+                .from('user_groups')
+                .delete()
+                .in('user_id', conflictUserIds)
+                .neq('group_id', id);
+            } else if (conflict_action === 'remove_from_group') {
+              // Remove conflicting users from this group
+              await supabase
+                .from('user_groups')
+                .delete()
+                .in('user_id', conflictUserIds)
+                .eq('group_id', id);
+            } else {
+              // Prompt user with warning modal
+              return NextResponse.json({
+                conflict: true,
+                message: 'Some members belong to other groups with internet access.',
+                conflicts,
+              });
+            }
+          }
+        }
+      }
+
       const updateData: any = { updated_at: new Date().toISOString() };
       if (is_protected !== undefined) updateData.is_protected = Boolean(is_protected);
+      if (is_no_internet !== undefined) updateData.is_no_internet = Boolean(is_no_internet);
       if (name && typeof name === 'string') updateData.name = name.trim();
 
       const { data, error } = await supabase
@@ -287,13 +405,107 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ success: true, group: data });
     } else {
       const state = getMockState();
-      let updatedGroup: Group | null = null;
+      const currentGroup = state.mockGroups.find((g) => g.id === id);
 
+      if (!currentGroup) {
+        return NextResponse.json({ error: 'Group not found' }, { status: 404 });
+      }
+
+      // Incompatibility: cannot be both Protected and No Internet
+      if (is_protected === true && (currentGroup.is_no_internet || is_no_internet === true)) {
+        return NextResponse.json(
+          { error: 'A group cannot be both Protected and No Internet.' },
+          { status: 400 }
+        );
+      }
+      if (is_no_internet === true && (currentGroup.is_protected || is_protected === true)) {
+        return NextResponse.json(
+          { error: 'A group cannot be both Protected and No Internet.' },
+          { status: 400 }
+        );
+      }
+
+      // If enabling No Internet, check member conflicts
+      if (is_no_internet === true) {
+        const members = state.mockUsers.filter((u) => u.groups.some((g) => g.id === id));
+
+        // Check if any member is in a protected group
+        for (const m of members) {
+          const protG = m.groups.find((g) => g.is_protected);
+          if (protG) {
+            return NextResponse.json(
+              {
+                error: `Cannot tag group as No Internet: Member "${m.name}" is currently in protected group "${protG.name}". Administrator must remove the user from the protected group first.`,
+                protected_conflict: true,
+              },
+              { status: 400 }
+            );
+          }
+        }
+
+        // Check multi-group conflicts
+        const conflicts: { userId: string; userName: string; mac: string; otherGroups: string[] }[] = [];
+        for (const m of members) {
+          const otherGs = m.groups.filter((g) => g.id !== id && !g.is_no_internet);
+          if (otherGs.length > 0) {
+            conflicts.push({
+              userId: m.id,
+              userName: m.name,
+              mac: m.mac_address,
+              otherGroups: otherGs.map((g) => g.name),
+            });
+          }
+        }
+
+        if (conflicts.length > 0) {
+          const conflictIds = new Set(conflicts.map((c) => c.userId));
+
+          if (conflict_action === 'force_add') {
+            // Remove conflicting users from all other groups, leaving only this group
+            state.setMockUsers(
+              state.mockUsers.map((u) => {
+                if (conflictIds.has(u.id)) {
+                  return {
+                    ...u,
+                    groups: u.groups.filter((g) => g.id === id),
+                    updated_at: new Date().toISOString(),
+                  };
+                }
+                return u;
+              })
+            );
+          } else if (conflict_action === 'remove_from_group') {
+            // Remove conflicting users from this group, leaving them in their other groups
+            state.setMockUsers(
+              state.mockUsers.map((u) => {
+                if (conflictIds.has(u.id)) {
+                  return {
+                    ...u,
+                    groups: u.groups.filter((g) => g.id !== id),
+                    updated_at: new Date().toISOString(),
+                  };
+                }
+                return u;
+              })
+            );
+          } else {
+            // Prompt user with warning modal
+            return NextResponse.json({
+              conflict: true,
+              message: 'Some members belong to other groups with internet access.',
+              conflicts,
+            });
+          }
+        }
+      }
+
+      let updatedGroup: Group | null = null;
       const newGroups = state.mockGroups.map((g) => {
         if (g.id === id) {
           updatedGroup = {
             ...g,
             is_protected: is_protected !== undefined ? Boolean(is_protected) : g.is_protected,
+            is_no_internet: is_no_internet !== undefined ? Boolean(is_no_internet) : g.is_no_internet,
             name: name && typeof name === 'string' ? name.trim() : g.name,
             updated_at: new Date().toISOString(),
           };
@@ -302,11 +514,15 @@ export async function PATCH(request: Request) {
         return g;
       });
 
-      if (!updatedGroup) {
-        return NextResponse.json({ error: 'Group not found' }, { status: 404 });
-      }
-
       state.setMockGroups(newGroups);
+      if (updatedGroup) {
+        state.setMockUsers(
+          state.mockUsers.map((u) => ({
+            ...u,
+            groups: u.groups.map((ug) => (ug.id === id ? { ...ug, ...updatedGroup } : ug)),
+          }))
+        );
+      }
       return NextResponse.json({ success: true, group: updatedGroup });
     }
   } catch (err: any) {

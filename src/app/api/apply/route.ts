@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getServiceSupabase } from '@/lib/supabase';
-import { generateFirewallConfig, generateEthersConfig, computeConfigHash } from '@/lib/config-generator';
+import { generateFirewallConfig, generateEthersConfig, computeConfigHash, UserConfigInput } from '@/lib/config-generator';
 import { getMockState } from '@/lib/mock-store';
 
 export async function POST() {
@@ -87,12 +87,25 @@ export async function POST() {
 
       const { data: finalUserData, error: finalError } = await supabase
         .from('users')
-        .select('name, mac_address')
+        .select(`
+          name,
+          mac_address,
+          user_groups (
+            groups (
+              is_no_internet
+            )
+          )
+        `)
         .order('name');
 
       if (finalError) throw finalError;
 
-      const finalUsers = finalUserData || [];
+      const finalUsers: UserConfigInput[] = (finalUserData || []).map((u: any) => ({
+        name: u.name,
+        mac_address: u.mac_address,
+        is_no_internet: Boolean(u.user_groups?.some((ug: any) => ug.groups?.is_no_internet)),
+      }));
+
       const firewallContent = generateFirewallConfig(finalUsers);
       const ethersContent = generateEthersConfig(finalUsers);
       const hash = computeConfigHash(firewallContent, ethersContent);
@@ -189,7 +202,15 @@ export async function POST() {
     }
 
     const nextVer = state.mockVersion + 1;
-    const firewall = generateFirewallConfig(updatedUsers);
+    const finalUsersForConfig: UserConfigInput[] = updatedUsers.map((u) => {
+      const uGroups = u.groups.map((ug) => state.mockGroups.find((mg) => mg.id === ug.id) || ug);
+      return {
+        name: u.name,
+        mac_address: u.mac_address,
+        is_no_internet: Boolean(uGroups.some((g) => g.is_no_internet)),
+      };
+    });
+    const firewall = generateFirewallConfig(finalUsersForConfig);
     const ethers = generateEthersConfig(updatedUsers);
     const hash = computeConfigHash(firewall, ethers);
 

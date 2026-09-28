@@ -61,8 +61,16 @@ export default function DashboardPage() {
   // Group Page State (creating new group)
   const [newGroupName, setNewGroupName] = useState('');
   const [newGroupIsProtected, setNewGroupIsProtected] = useState(false);
+  const [newGroupIsNoInternet, setNewGroupIsNoInternet] = useState(false);
   const [groupError, setGroupError] = useState<string | null>(null);
   const [groupLoading, setGroupLoading] = useState(false);
+
+  // Multi-Group Conflict Modal State (No Internet Tagging)
+  const [conflictModalData, setConflictModalData] = useState<{
+    targetGroup: Group;
+    conflicts: { userId: string; userName: string; mac: string; otherGroups: string[] }[];
+  } | null>(null);
+  const [isResolvingConflict, setIsResolvingConflict] = useState(false);
 
   // History Modal State
   const [showHistory, setShowHistory] = useState(false);
@@ -556,6 +564,7 @@ export default function DashboardPage() {
         body: JSON.stringify({
           name: newGroupName.trim(),
           is_protected: newGroupIsProtected,
+          is_no_internet: newGroupIsNoInternet,
         }),
       });
       const data = await res.json();
@@ -567,6 +576,7 @@ export default function DashboardPage() {
       showToast(`Group "${newGroupName.trim()}" created successfully`);
       setNewGroupName('');
       setNewGroupIsProtected(false);
+      setNewGroupIsNoInternet(false);
       fetchData();
     } catch (err: any) {
       setGroupError(err.message || 'Network error');
@@ -585,13 +595,52 @@ export default function DashboardPage() {
       });
       const data = await res.json();
       if (!res.ok) {
-        showToast(data.error || 'Failed to update group protection', 'error');
+        alert(data.error || 'Failed to update group protection');
         return;
       }
       showToast(`Group protection updated to ${!currentProtection ? 'Protected' : 'Standard'}`);
       fetchData();
     } catch {
       showToast('Network error updating group protection', 'error');
+    }
+  };
+
+  // Toggle Group No-Internet Tag (Admin only, with conflict handling)
+  const handleToggleNoInternet = async (group: Group, conflictAction?: 'force_add' | 'remove_from_group') => {
+    try {
+      const nextNoInternet = conflictAction ? true : !group.is_no_internet;
+      const res = await fetch('/api/groups', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: group.id,
+          is_no_internet: nextNoInternet,
+          conflict_action: conflictAction,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error || 'Failed to update No Internet status');
+        return;
+      }
+
+      if (data.conflict) {
+        setConflictModalData({
+          targetGroup: group,
+          conflicts: data.conflicts,
+        });
+        return;
+      }
+
+      setConflictModalData(null);
+      showToast(
+        nextNoInternet
+          ? `Group "${group.name}" tagged as No Internet. Internet blocked for members.`
+          : `Group "${group.name}" restored to Internet Access.`
+      );
+      fetchData();
+    } catch {
+      showToast('Network error updating No Internet tag', 'error');
     }
   };
 
@@ -1117,9 +1166,12 @@ export default function DashboardPage() {
                     >
                       {groups.map((g) => {
                         const isRestricted = currentUser.role === 'subadmin' && g.is_protected;
+                        let suffix = '';
+                        if (g.is_protected) suffix = ' (🔒 Protected)';
+                        if (g.is_no_internet) suffix = ' (🚫 No Internet)';
                         return (
                           <option key={g.id} value={g.id} disabled={isRestricted}>
-                            {g.name} {g.is_protected ? '(🔒 Protected)' : ''}
+                            {g.name}{suffix}
                           </option>
                         );
                       })}
@@ -1141,6 +1193,13 @@ export default function DashboardPage() {
                     </button>
                   </div>
                 </form>
+
+                {groups.find((g) => g.id === addSelectedGroup)?.is_no_internet && (
+                  <div className="form-exclusive-notice" style={{ marginTop: '0.65rem' }}>
+                    <span>🚫</span>
+                    <span><strong>No Internet Policy:</strong> WAN access will be blocked for this MAC address via dedicated firewall rule.</span>
+                  </div>
+                )}
 
                 {addError && (
                   <div className="add-bar-alert-error">
@@ -1180,7 +1239,7 @@ export default function DashboardPage() {
                   <option value="ALL">All Groups</option>
                   {groups.map((g) => (
                     <option key={g.id} value={g.id}>
-                      {g.name}
+                      {g.name} {g.is_no_internet ? '(🚫 No Internet)' : ''}
                     </option>
                   ))}
                 </select>
@@ -1191,7 +1250,7 @@ export default function DashboardPage() {
                 <table className="data-table">
                   <thead>
                     <tr>
-                      <th style={{ width: '130px' }}>STATUS</th>
+                      <th style={{ width: '150px' }}>STATUS</th>
                       <th>NAME</th>
                       <th>MAC ADDRESS</th>
                       <th>ASSIGNED GROUPS</th>
@@ -1206,38 +1265,55 @@ export default function DashboardPage() {
                         </td>
                       </tr>
                     ) : (
-                      users.map((u) => (
-                        <tr key={u.id} style={{ opacity: u.status === 'deleted' ? 0.4 : 1 }}>
-                          <td>
-                            <span className={`status-badge-capsule status-badge-${u.status}`}>
-                              <span className="status-green-dot"></span>
-                              <span>{u.status}</span>
-                            </span>
-                          </td>
-                          <td>
-                            <span className="user-name-cell">{u.name}</span>
-                          </td>
-                          <td>
-                            <span className="mac-address-pill">{u.mac_address}</span>
-                          </td>
-                          <td>
-                            <div className="group-tags-wrap">
-                              {u.groups && u.groups.length > 0 ? (
-                                u.groups.map((g) => (
-                                  <span key={g.id} className="group-tag-pill">
-                                    {g.name}
-                                    {g.is_protected && (
-                                      <span style={{ marginLeft: '0.25rem', color: '#DC2626', fontWeight: 700 }} title="Protected Group">
-                                        🔒
-                                      </span>
-                                    )}
-                                  </span>
-                                ))
+                      users.map((u) => {
+                        const isNoInternetUser = u.groups?.some((g) => g.is_no_internet);
+                        return (
+                          <tr key={u.id} style={{ opacity: u.status === 'deleted' ? 0.4 : 1 }}>
+                            <td>
+                              {isNoInternetUser ? (
+                                <span className="badge-no-internet" title="Internet access blocked by firewall rule">
+                                  🚫 No Internet
+                                </span>
                               ) : (
-                                <span className="group-tag-pill">Default</span>
+                                <span className={`status-badge-capsule status-badge-${u.status}`}>
+                                  <span className="status-green-dot"></span>
+                                  <span>{u.status}</span>
+                                </span>
                               )}
-                            </div>
-                          </td>
+                            </td>
+                            <td>
+                              <span className="user-name-cell">{u.name}</span>
+                            </td>
+                            <td>
+                              <span className="mac-address-pill">{u.mac_address}</span>
+                            </td>
+                            <td>
+                              <div className="group-tags-wrap">
+                                {u.groups && u.groups.length > 0 ? (
+                                  u.groups.map((g) => (
+                                    <span
+                                      key={g.id}
+                                      className="group-tag-pill"
+                                      style={
+                                        g.is_no_internet
+                                          ? { borderColor: 'rgba(220, 38, 38, 0.4)', background: 'rgba(220, 38, 38, 0.08)' }
+                                          : undefined
+                                      }
+                                    >
+                                      {g.is_no_internet ? '🚫 ' : ''}
+                                      {g.name}
+                                      {g.is_protected && (
+                                        <span style={{ marginLeft: '0.25rem', color: '#DC2626', fontWeight: 700 }} title="Protected Group">
+                                          🔒
+                                        </span>
+                                      )}
+                                    </span>
+                                  ))
+                                ) : (
+                                  <span className="group-tag-pill">Default</span>
+                                )}
+                              </div>
+                            </td>
                           <td>
                             {u.status !== 'deleted' ? (
                               <div className="table-actions-cell">
@@ -1269,8 +1345,9 @@ export default function DashboardPage() {
                             )}
                           </td>
                         </tr>
-                      ))
-                    )}
+                      );
+                    })
+                  )}
                   </tbody>
                 </table>
               </div>
@@ -1329,14 +1406,32 @@ export default function DashboardPage() {
                   </div>
 
                   {currentUser.role === 'admin' && (
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', marginTop: '0.65rem', fontSize: '0.82rem', cursor: 'pointer', color: 'var(--text-primary)' }}>
-                      <input
-                        type="checkbox"
-                        checked={newGroupIsProtected}
-                        onChange={(e) => setNewGroupIsProtected(e.target.checked)}
-                      />
-                      <span>Tag as <strong>Protected Group</strong> (Subadmins cannot assign, edit, or delete users under this group)</span>
-                    </label>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '0.75rem' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.82rem', cursor: newGroupIsNoInternet ? 'not-allowed' : 'pointer', color: 'var(--text-primary)', opacity: newGroupIsNoInternet ? 0.5 : 1 }}>
+                        <input
+                          type="checkbox"
+                          disabled={newGroupIsNoInternet}
+                          checked={newGroupIsProtected}
+                          onChange={(e) => {
+                            setNewGroupIsProtected(e.target.checked);
+                            if (e.target.checked) setNewGroupIsNoInternet(false);
+                          }}
+                        />
+                        <span>Tag as <strong>Protected Group</strong> (Subadmins cannot assign, edit, or delete users under this group)</span>
+                      </label>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.82rem', cursor: newGroupIsProtected ? 'not-allowed' : 'pointer', color: 'var(--text-primary)', opacity: newGroupIsProtected ? 0.5 : 1 }}>
+                        <input
+                          type="checkbox"
+                          disabled={newGroupIsProtected}
+                          checked={newGroupIsNoInternet}
+                          onChange={(e) => {
+                            setNewGroupIsNoInternet(e.target.checked);
+                            if (e.target.checked) setNewGroupIsProtected(false);
+                          }}
+                        />
+                        <span>Tag as <strong>No Internet Group</strong> (WAN access blocked by dedicated OpenWrt firewall rule)</span>
+                      </label>
+                    </div>
                   )}
 
                   {groupError && <div className="form-alert-msg" style={{ marginTop: '0.75rem', maxWidth: '420px' }}>{groupError}</div>}
@@ -1350,8 +1445,8 @@ export default function DashboardPage() {
                     <tr>
                       <th>GROUP NAME</th>
                       <th>TOTAL USERS</th>
-                      <th>PROTECTION TYPE</th>
-                      <th style={{ textAlign: 'right', width: '220px' }}>ACTIONS</th>
+                      <th>ACCESS &amp; PROTECTION TAGS</th>
+                      <th style={{ textAlign: 'right', width: '280px' }}>ACTIONS</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1378,26 +1473,48 @@ export default function DashboardPage() {
                             </span>
                           </td>
                           <td>
-                            {group.is_protected ? (
-                              <span className="badge-protected">
-                                🔒 Protected
-                              </span>
-                            ) : (
-                              <span className="badge-standard">
-                                Standard
-                              </span>
-                            )}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
+                              {group.is_protected && (
+                                <span className="badge-protected">
+                                  🔒 Protected
+                                </span>
+                              )}
+                              {group.is_no_internet ? (
+                                <span className="badge-no-internet">
+                                  🚫 No Internet
+                                </span>
+                              ) : (
+                                !group.is_protected && (
+                                  <span className="badge-internet">
+                                    🌐 Internet Allowed
+                                  </span>
+                                )
+                              )}
+                            </div>
                           </td>
                           <td>
                             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', alignItems: 'center' }}>
                               {currentUser.role === 'admin' && !isDefault && (
-                                <button
-                                  type="button"
-                                  className="btn-text-action"
-                                  onClick={() => handleToggleProtection(group.id, Boolean(group.is_protected))}
-                                >
-                                  {group.is_protected ? 'Unprotect' : 'Make Protected'}
-                                </button>
+                                <>
+                                  {!group.is_no_internet && (
+                                    <button
+                                      type="button"
+                                      className="btn-text-action"
+                                      onClick={() => handleToggleProtection(group.id, Boolean(group.is_protected))}
+                                    >
+                                      {group.is_protected ? 'Unprotect' : 'Make Protected'}
+                                    </button>
+                                  )}
+                                  {!group.is_protected && (
+                                    <button
+                                      type="button"
+                                      className="btn-text-action"
+                                      onClick={() => handleToggleNoInternet(group)}
+                                    >
+                                      {group.is_no_internet ? 'Allow Internet' : 'Tag No Internet'}
+                                    </button>
+                                  )}
+                                </>
                               )}
                               {!isDefault ? (
                                 <button
@@ -1714,21 +1831,45 @@ export default function DashboardPage() {
                   {groups.map((group) => {
                     const isChecked = formGroupIds.includes(group.id);
                     const isRestrictedForSubadmin = currentUser?.role === 'subadmin' && group.is_protected;
+
+                    // Protected incompatibility: cannot assign to No Internet if currently in or selecting protected group
+                    const selectedHasProtected = formGroupIds.some((id) => groups.find((g) => g.id === id)?.is_protected);
+                    const isProtectedConflict = group.is_no_internet && selectedHasProtected;
+
+                    const isDisabled = isRestrictedForSubadmin || isProtectedConflict;
+
                     return (
                       <label
                         key={group.id}
                         className="checkbox-tag-item"
-                        style={{ opacity: isRestrictedForSubadmin ? 0.45 : 1, cursor: isRestrictedForSubadmin ? 'not-allowed' : 'pointer' }}
-                        title={isRestrictedForSubadmin ? 'Protected group (Administrator only)' : ''}
+                        style={{
+                          opacity: isDisabled ? 0.45 : 1,
+                          cursor: isDisabled ? 'not-allowed' : 'pointer',
+                          borderColor: group.is_no_internet ? 'rgba(220, 38, 38, 0.4)' : undefined,
+                        }}
+                        title={
+                          isRestrictedForSubadmin
+                            ? 'Protected group (Administrator only)'
+                            : isProtectedConflict
+                            ? 'Cannot assign to No Internet while assigned to protected group. Remove protected group first.'
+                            : ''
+                        }
                       >
                         <input
                           type="checkbox"
-                          disabled={isRestrictedForSubadmin}
+                          disabled={isDisabled}
                           checked={isChecked}
                           onChange={(e) => {
-                            if (isRestrictedForSubadmin) return;
+                            if (isDisabled) return;
                             if (e.target.checked) {
-                              setFormGroupIds([...formGroupIds, group.id]);
+                              if (group.is_no_internet) {
+                                // Rule: exclusive No Internet - replace all other regular groups
+                                setFormGroupIds([group.id]);
+                              } else {
+                                // Rule: adding regular group removes any No Internet group
+                                const filtered = formGroupIds.filter((id) => !groups.find((g) => g.id === id)?.is_no_internet);
+                                setFormGroupIds([...filtered, group.id]);
+                              }
                             } else {
                               const remaining = formGroupIds.filter((id) => id !== group.id);
                               const defaultGroup = groups.find((g) => g.name.toLowerCase() === 'default');
@@ -1741,14 +1882,31 @@ export default function DashboardPage() {
                           }}
                         />
                         <span>
+                          {group.is_no_internet ? '🚫 ' : ''}
                           {group.name}
                           {group.is_protected ? ' (🔒 Protected)' : ''}
+                          {group.is_no_internet ? ' (No Internet)' : ''}
                         </span>
                       </label>
                     );
                   })}
                 </div>
-                <div className="form-help-caption">Groups are organizational tags and do not affect firewall rules.</div>
+
+                {formGroupIds.some((id) => groups.find((g) => g.id === id)?.is_no_internet) && (
+                  <div className="form-exclusive-notice">
+                    <span>🚫</span>
+                    <span><strong>No Internet Policy:</strong> Devices in a No Internet group cannot be assigned to any group with internet access. Internet access will be blocked via firewall rule.</span>
+                  </div>
+                )}
+
+                {formGroupIds.some((id) => groups.find((g) => g.id === id)?.is_protected) && (
+                  <div className="form-exclusive-notice">
+                    <span>🔒</span>
+                    <span><strong>Protected Group:</strong> Users in protected groups cannot be placed into No Internet groups unless removed from protected groups first.</span>
+                  </div>
+                )}
+
+                <div className="form-help-caption">No Internet groups block WAN access via dedicated firewall rule. Regular groups allow internet access.</div>
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.65rem', marginTop: '1.75rem' }}>
@@ -1869,6 +2027,97 @@ export default function DashboardPage() {
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1.75rem' }}>
               <button className="btn btn-secondary" onClick={() => setShowSettingsModal(false)}>
                 Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Multi-Group Conflict Modal (No Internet Group Tagging) */}
+      {conflictModalData && (
+        <div className="conflict-modal-overlay">
+          <div className="conflict-modal-card">
+            <div className="modal-header-row">
+              <h3 className="modal-headline" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span>⚠️</span>
+                <span>Warning: Multi-Group Conflict</span>
+              </h3>
+              <button
+                onClick={() => setConflictModalData(null)}
+                className="modal-close-icon"
+                disabled={isResolvingConflict}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="conflict-warning-box">
+              <div className="conflict-warning-icon">⚠️</div>
+              <div style={{ fontSize: '0.84rem', lineHeight: 1.5, color: 'var(--text-primary)' }}>
+                <strong>Policy Violation:</strong> No user can be a member of a &quot;No Internet&quot; group and another group that has internet access.
+                <div style={{ marginTop: '0.35rem', color: 'var(--text-secondary)' }}>
+                  The following user(s) in group <strong>&quot;{conflictModalData.targetGroup.name}&quot;</strong> are also members of other internet-enabled groups:
+                </div>
+              </div>
+            </div>
+
+            <div className="conflict-users-list">
+              {conflictModalData.conflicts.map((c) => (
+                <div key={c.userId} className="conflict-user-card">
+                  <div className="conflict-user-meta">
+                    <span className="conflict-user-name">{c.userName}</span>
+                    <span className="conflict-user-mac">{c.mac}</span>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginBottom: '0.2rem' }}>
+                      Also in:
+                    </div>
+                    <div className="conflict-other-groups">
+                      {c.otherGroups.map((gName, idx) => (
+                        <span key={idx} className="group-tag-pill">
+                          {gName}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="conflict-actions-footer">
+              <button
+                type="button"
+                className="btn btn-secondary"
+                disabled={isResolvingConflict}
+                onClick={() => setConflictModalData(null)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn-conflict-remove"
+                disabled={isResolvingConflict}
+                onClick={async () => {
+                  setIsResolvingConflict(true);
+                  await handleToggleNoInternet(conflictModalData.targetGroup, 'remove_from_group');
+                  setIsResolvingConflict(false);
+                }}
+                title="Removes these users from this group only. They will keep their other groups."
+              >
+                {isResolvingConflict ? 'Resolving...' : 'Remove from this Group'}
+              </button>
+              <button
+                type="button"
+                className="btn-force-danger"
+                disabled={isResolvingConflict}
+                onClick={async () => {
+                  setIsResolvingConflict(true);
+                  await handleToggleNoInternet(conflictModalData.targetGroup, 'force_add');
+                  setIsResolvingConflict(false);
+                }}
+                title="Removes these users from other groups and keeps them only in this No Internet group."
+              >
+                {isResolvingConflict ? 'Resolving...' : 'Force Add to No Internet'}
               </button>
             </div>
           </div>

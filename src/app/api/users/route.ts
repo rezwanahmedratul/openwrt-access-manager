@@ -30,7 +30,7 @@ export async function GET(request: Request) {
           id, name, mac_address, created_at, updated_at,
           user_groups (
             group_id,
-            groups ( id, name, is_protected, created_at, updated_at )
+            groups ( id, name, is_protected, is_no_internet, created_at, updated_at )
           )
         `)
         .order('name');
@@ -72,7 +72,10 @@ export async function GET(request: Request) {
       lastApplied = mock.mockLastApplied;
     }
   } else {
-    appliedUsers = mock.mockUsers;
+    appliedUsers = mock.mockUsers.map((u) => ({
+      ...u,
+      groups: u.groups.map((ug) => mock.mockGroups.find((mg) => mg.id === ug.id) || ug),
+    }));
     groups = mock.mockGroups;
     draftChanges = mock.mockDraftChanges;
     currentVersion = mock.mockVersion;

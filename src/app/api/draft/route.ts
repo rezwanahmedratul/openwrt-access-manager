@@ -68,6 +68,55 @@ export async function POST(request: Request) {
     // Session check for role authorization on protected groups
     const session = getSessionFromRequest(request);
 
+    // Rule: Exclusive internet state and protected group compatibility
+    if (operation !== 'DELETE' && resolvedGroupIds.length > 0) {
+      if (isSupabaseConfigured) {
+        const { data: targetGroups } = await supabase
+          .from('groups')
+          .select('id, name, is_protected, is_no_internet')
+          .in('id', resolvedGroupIds);
+
+        const hasNoInternet = (targetGroups || []).some((g: any) => g.is_no_internet);
+        const hasInternet = (targetGroups || []).some((g: any) => !g.is_no_internet);
+        const hasProtected = (targetGroups || []).some((g: any) => g.is_protected);
+
+        if (hasNoInternet && hasInternet) {
+          return NextResponse.json(
+            { error: 'A user cannot belong to a "No Internet" group and another group with internet access at the same time.' },
+            { status: 400 }
+          );
+        }
+
+        if (hasNoInternet && hasProtected) {
+          return NextResponse.json(
+            { error: 'Users in protected groups cannot be assigned to a No Internet group. The user must be removed from protected groups first.' },
+            { status: 400 }
+          );
+        }
+      } else {
+        const state = getMockState();
+        const targetGroups = state.mockGroups.filter((g) => resolvedGroupIds.includes(g.id));
+
+        const hasNoInternet = targetGroups.some((g) => g.is_no_internet);
+        const hasInternet = targetGroups.some((g) => !g.is_no_internet);
+        const hasProtected = targetGroups.some((g) => g.is_protected);
+
+        if (hasNoInternet && hasInternet) {
+          return NextResponse.json(
+            { error: 'A user cannot belong to a "No Internet" group and another group with internet access at the same time.' },
+            { status: 400 }
+          );
+        }
+
+        if (hasNoInternet && hasProtected) {
+          return NextResponse.json(
+            { error: 'Users in protected groups cannot be assigned to a No Internet group. The user must be removed from protected groups first.' },
+            { status: 400 }
+          );
+        }
+      }
+    }
+
     // If caller is subadmin, verify they are not modifying or assigning protected groups
     if (session && session.role === 'subadmin') {
       const state = getMockState();
