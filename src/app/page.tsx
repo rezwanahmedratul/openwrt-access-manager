@@ -76,8 +76,25 @@ export default function DashboardPage() {
   const [showHistory, setShowHistory] = useState(false);
   const [historyList, setHistoryList] = useState<any[]>([]);
 
-  // Settings Modal State
-  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  // Settings Page State
+  const [gatewayIp, setGatewayIp] = useState('192.168.1.1');
+  const [pollingInterval, setPollingInterval] = useState('10');
+  const [blockPolicy, setBlockPolicy] = useState<'REJECT' | 'DROP'>('REJECT');
+  const [showSecretToken, setShowSecretToken] = useState(false);
+  const [tokenCopied, setTokenCopied] = useState(false);
+  const [synFloodEnabled, setSynFloodEnabled] = useState(true);
+  const [flowOffloadingEnabled, setFlowOffloadingEnabled] = useState(true);
+  const [flowOffloadingHwEnabled, setFlowOffloadingHwEnabled] = useState(true);
+  const [fullconeNatEnabled, setFullconeNatEnabled] = useState(true);
+  const [isTestingGateway, setIsTestingGateway] = useState(false);
+  const [gatewayLatency, setGatewayLatency] = useState<number | null>(null);
+
+  // MAC Authentication Switch Modal & Schedule State
+  const [showMacAuthModal, setShowMacAuthModal] = useState(false);
+  const [macAuthDisableMode, setMacAuthDisableMode] = useState<'infinite' | '1hour' | '1day' | '7days' | '30days' | 'custom'>('1hour');
+  const [customMacAuthDate, setCustomMacAuthDate] = useState('');
+  const [isUpdatingMacAuth, setIsUpdatingMacAuth] = useState(false);
+  const [macAuthModalError, setMacAuthModalError] = useState<string | null>(null);
 
   // Feedback Notification
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
@@ -85,6 +102,177 @@ export default function DashboardPage() {
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
     setNotification({ message, type });
     setTimeout(() => setNotification(null), 4000);
+  };
+
+  const handleCopyText = (text: string, type: 'token' | 'endpoint') => {
+    navigator.clipboard.writeText(text);
+    if (type === 'token') {
+      setTokenCopied(true);
+      setTimeout(() => setTokenCopied(false), 2500);
+    }
+    showToast('Copied to clipboard');
+  };
+
+  const handleTestGateway = async () => {
+    setIsTestingGateway(true);
+    setGatewayLatency(null);
+    const start = performance.now();
+    try {
+      const res = await fetch('/api/config/version', {
+        headers: { Authorization: 'Bearer openwrt-secret-token-change-in-production' },
+      });
+      const end = performance.now();
+      if (res.ok) {
+        const ms = Math.round(end - start);
+        setGatewayLatency(ms);
+        showToast(`Gateway healthy (Response: ${ms}ms)`);
+      } else {
+        showToast('Gateway test returned an error', 'error');
+      }
+    } catch {
+      showToast('Gateway connection failed', 'error');
+    } finally {
+      setIsTestingGateway(false);
+    }
+  };
+
+  const handleToggleMacAuthClick = () => {
+    const isCurrentlyOn = stats.mac_auth ? stats.mac_auth.enabled : true;
+    if (isCurrentlyOn) {
+      // Opening modal to turn it OFF
+      setMacAuthModalError(null);
+      if (currentUser?.role === 'admin') {
+        setMacAuthDisableMode('infinite');
+      } else {
+        setMacAuthDisableMode('1hour');
+      }
+      // Set default custom date to tomorrow
+      const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000);
+      const isoLocal = new Date(tomorrow.getTime() - tomorrow.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+      setCustomMacAuthDate(isoLocal);
+      setShowMacAuthModal(true);
+    } else {
+      // Turning it back ON directly
+      handleEnableMacAuth();
+    }
+  };
+
+  const handleEnableMacAuth = async () => {
+    setIsUpdatingMacAuth(true);
+    try {
+      const res = await fetch('/api/config/mac-auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: true }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        showToast(data.error || 'Failed to enable MAC Authentication', 'error');
+        return;
+      }
+      showToast(data.message || 'MAC Authentication enabled (Access restricted to registered MACs)');
+      fetchData();
+    } catch (err: any) {
+      showToast(err.message || 'Failed to update MAC Authentication', 'error');
+    } finally {
+      setIsUpdatingMacAuth(false);
+    }
+  };
+
+  const handleConfirmDisableMacAuth = async () => {
+    setMacAuthModalError(null);
+    let targetExpiry: string | null = null;
+
+    if (macAuthDisableMode === 'infinite') {
+      if (currentUser?.role !== 'admin') {
+        setMacAuthModalError('Only administrators can permanently disable MAC authentication.');
+        return;
+      }
+      targetExpiry = null;
+    } else if (macAuthDisableMode === '1hour') {
+      targetExpiry = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+    } else if (macAuthDisableMode === '1day') {
+      targetExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+    } else if (macAuthDisableMode === '7days') {
+      targetExpiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    } else if (macAuthDisableMode === '30days') {
+      targetExpiry = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+    } else if (macAuthDisableMode === 'custom') {
+      if (!customMacAuthDate) {
+        setMacAuthModalError('Please pick an expiration date/time from the calendar.');
+        return;
+      }
+      const parsed = new Date(customMacAuthDate);
+      if (isNaN(parsed.getTime()) || parsed.getTime() <= Date.now()) {
+        setMacAuthModalError('Expiration date must be in the future.');
+        return;
+      }
+      if (currentUser?.role === 'subadmin') {
+        const maxLimit = Date.now() + 30 * 24 * 60 * 60 * 1000;
+        if (parsed.getTime() > maxLimit + 60000) {
+          setMacAuthModalError('Subadmins can disable MAC authentication for at most 30 days.');
+          return;
+        }
+      }
+      targetExpiry = parsed.toISOString();
+    }
+
+    setIsUpdatingMacAuth(true);
+    try {
+      const res = await fetch('/api/config/mac-auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          enabled: false,
+          disabled_until: targetExpiry,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setMacAuthModalError(data.error || 'Failed to update MAC Authentication');
+        return;
+      }
+      showToast(data.message || 'MAC Authentication disabled');
+      setShowMacAuthModal(false);
+      fetchData();
+    } catch (err: any) {
+      setMacAuthModalError(err.message || 'Network error occurred');
+    } finally {
+      setIsUpdatingMacAuth(false);
+    }
+  };
+
+  const handleExportConfig = () => {
+    const backup = {
+      exported_at: new Date().toISOString(),
+      version: stats.current_version,
+      gateway: {
+        ip: gatewayIp,
+        polling_interval_seconds: pollingInterval,
+        block_policy: blockPolicy,
+      },
+      users: users.map((u) => ({
+        id: u.id,
+        name: u.name,
+        mac_address: u.mac_address,
+        groups: u.groups.map((g) => g.name),
+      })),
+      groups: groups.map((g) => ({
+        id: g.id,
+        name: g.name,
+        is_protected: Boolean(g.is_protected),
+        is_no_internet: Boolean(g.is_no_internet),
+      })),
+    };
+
+    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `openwrt-config-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('System configuration backup downloaded');
   };
 
   // Theme Initialization (localStorage & system preference)
@@ -701,9 +889,10 @@ export default function DashboardPage() {
   // Auth Loading Screen
   if (authChecking) {
     return (
-      <div className="auth-page-container">
-        <div style={{ color: 'var(--text-secondary)', fontSize: '0.92rem', fontWeight: 500 }}>
-          Authenticating gateway session...
+      <div className="auth-page-container" style={{ background: 'var(--bg-app)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', color: 'var(--text-secondary)', fontSize: '0.86rem', fontWeight: 500 }}>
+          <span className="gateway-pill-dot" style={{ animation: 'pulse 1s infinite' }}></span>
+          <span>Connecting to OpenWrt Gateway...</span>
         </div>
       </div>
     );
@@ -855,7 +1044,7 @@ export default function DashboardPage() {
             <li>
               <button
                 className={`nav-item-btn ${activeTab === 'settings' ? 'active' : ''}`}
-                onClick={() => { setActiveTab('settings'); setShowSettingsModal(true); }}
+                onClick={() => setActiveTab('settings')}
               >
                 <span className="nav-icon">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -1006,12 +1195,39 @@ export default function DashboardPage() {
               </div>
 
               {/* Page Headline */}
-              <div className="header-row">
+              <div className="header-row" style={{ alignItems: 'flex-start' }}>
                 <div className="title-col">
                   <h1 className="page-headline">MAC Authentication</h1>
                   <p className="page-description">
                     Publish deterministic access control policies and static DHCP lease bindings directly to your OpenWrt router.
                   </p>
+                </div>
+                <div className="actions-col" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                  {stats.mac_auth && !stats.mac_auth.enabled ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.25)', padding: '0.4rem 0.85rem', borderRadius: 'var(--radius-md)' }}>
+                      <span className="status-indicator-dot" style={{ background: '#ef4444' }}></span>
+                      <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#ef4444' }}>
+                        MAC Auth: OFF (Open)
+                      </span>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.25)', padding: '0.4rem 0.85rem', borderRadius: 'var(--radius-md)' }}>
+                      <span className="status-indicator-dot" style={{ background: '#10b981' }}></span>
+                      <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#10b981' }}>
+                        MAC Auth: ON (Enforced)
+                      </span>
+                    </div>
+                  )}
+
+                  <button
+                    type="button"
+                    className={`btn ${stats.mac_auth && !stats.mac_auth.enabled ? 'btn-primary' : 'btn-secondary'}`}
+                    disabled={isUpdatingMacAuth}
+                    onClick={handleToggleMacAuthClick}
+                    style={{ fontSize: '0.8rem', padding: '0.45rem 0.95rem', fontWeight: 600 }}
+                  >
+                    {isUpdatingMacAuth ? 'Updating...' : stats.mac_auth && !stats.mac_auth.enabled ? 'Turn ON MAC Auth' : 'Turn OFF MAC Auth'}
+                  </button>
                 </div>
               </div>
 
@@ -1732,6 +1948,534 @@ export default function DashboardPage() {
               )}
             </div>
           )}
+
+          {/* ============================================================
+              VIEW 4: DEDICATED REDESIGNED SETTINGS PAGE
+              ============================================================ */}
+          {activeTab === 'settings' && (
+            <div className="settings-page-wrapper">
+              {/* Small Top Pill */}
+              <div>
+                <div className="gateway-pill">
+                  <span className="gateway-pill-dot"></span>
+                  <span>System &amp; Gateway Configuration</span>
+                </div>
+              </div>
+
+              {/* Header Row */}
+              <div className="header-row">
+                <div className="title-col">
+                  <h1 className="page-headline">Settings</h1>
+                  <p className="page-description">
+                    Configure OpenWrt router synchronization, firewall security policies, automated polling frequency, and interface preferences.
+                  </p>
+                </div>
+                <div className="actions-col" style={{ display: 'flex', gap: '0.65rem' }}>
+                  <button className="btn btn-secondary" onClick={() => setActiveTab('dashboard')}>
+                    ← Back to Dashboard
+                  </button>
+                  <button
+                    className="btn btn-primary"
+                    onClick={() => showToast('Settings preferences saved')}
+                  >
+                    Save Preferences
+                  </button>
+                </div>
+              </div>
+
+              {/* SECTION 1: Master MAC Authentication Control */}
+              <div className="mac-auth-banner-card">
+                <div className="mac-auth-banner-left">
+                  <div className="mac-auth-banner-icon">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                      <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.35rem' }}>
+                      <h3 style={{ fontSize: '1.05rem', fontWeight: 700, margin: 0 }}>
+                        Global MAC Address Authentication
+                      </h3>
+                      {stats.mac_auth && !stats.mac_auth.enabled ? (
+                        <span className="mac-auth-badge-status mac-auth-badge-off">
+                          ● Disabled (Open to All)
+                        </span>
+                      ) : (
+                        <span className="mac-auth-badge-status mac-auth-badge-on">
+                          ● Enabled (Enforced)
+                        </span>
+                      )}
+                    </div>
+                    <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: '0.35rem 0 0 0', lineHeight: 1.4 }}>
+                      {stats.mac_auth && !stats.mac_auth.enabled ? (
+                        <>
+                          Forwarding set to <code>lan ➔ wan</code>. Internet access is allowed for <strong>all connected devices</strong> regardless of MAC address.
+                        </>
+                      ) : (
+                        <>
+                          Forwarding set to <code>lan ➔ unspecified</code>. Internet is strictly <strong>restricted to authorized MAC addresses</strong>.
+                        </>
+                      )}
+                    </p>
+                    {stats.mac_auth && !stats.mac_auth.enabled && stats.mac_auth.disabled_until && (
+                      <div className="mac-auth-timer-chip">
+                        <span>⏳</span>
+                        <span>
+                          Re-enables automatically on {new Date(stats.mac_auth.disabled_until).toLocaleString()}
+                        </span>
+                      </div>
+                    )}
+                    {stats.mac_auth && !stats.mac_auth.enabled && !stats.mac_auth.disabled_until && (
+                      <div className="mac-auth-timer-chip">
+                        <span>♾️</span>
+                        <span>Disabled permanently by Administrator</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                  <button
+                    type="button"
+                    className={`btn ${stats.mac_auth && !stats.mac_auth.enabled ? 'btn-primary' : 'btn-secondary'}`}
+                    disabled={isUpdatingMacAuth}
+                    onClick={handleToggleMacAuthClick}
+                    style={{ fontSize: '0.82rem', padding: '0.55rem 1.1rem', fontWeight: 700 }}
+                  >
+                    {isUpdatingMacAuth ? 'Updating...' : stats.mac_auth && !stats.mac_auth.enabled ? 'Turn ON MAC Auth' : 'Turn OFF MAC Auth'}
+                  </button>
+                </div>
+              </div>
+
+              {/* SECTION 2: Gateway Connection & Diagnostics */}
+              <div className="settings-section-card">
+                <div className="settings-section-header">
+                  <div className="settings-section-title-wrap">
+                    <h2 className="settings-section-title">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <rect x="2" y="2" width="20" height="8" rx="2" ry="2"/>
+                        <rect x="2" y="14" width="20" height="8" rx="2" ry="2"/>
+                        <line x1="6" y1="6" x2="6.01" y2="6"/>
+                        <line x1="6" y1="18" x2="6.01" y2="18"/>
+                      </svg>
+                      Router Gateway &amp; Polling
+                    </h2>
+                    <p className="settings-section-desc">
+                      Connection status and parameters for the target OpenWrt router daemon.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    disabled={isTestingGateway}
+                    onClick={handleTestGateway}
+                    style={{ fontSize: '0.8rem', padding: '0.45rem 0.85rem' }}
+                  >
+                    {isTestingGateway ? 'Pinging Gateway...' : '⚡ Test Connection'}
+                  </button>
+                </div>
+
+                <div className="settings-rows-list">
+                  <div className="settings-row-item">
+                    <div className="settings-row-info">
+                      <span className="settings-row-label">Connection Status</span>
+                      <span className="settings-row-caption">Live heartbeat signal from the OpenWrt router agent daemon.</span>
+                    </div>
+                    <div className="settings-row-control">
+                      <div className="gateway-pill" style={{ margin: 0 }}>
+                        <span className="gateway-pill-dot"></span>
+                        <span style={{ fontWeight: 600 }}>Active &amp; Polling</span>
+                      </div>
+                      {gatewayLatency !== null && (
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
+                          {gatewayLatency}ms
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="settings-row-item">
+                    <div className="settings-row-info">
+                      <span className="settings-row-label">Router Firmware &amp; Model</span>
+                      <span className="settings-row-caption">Detected operating system version running on the hardware gateway.</span>
+                    </div>
+                    <div className="settings-row-control">
+                      <span style={{ fontSize: '0.85rem', fontWeight: 600, fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>
+                        OpenWrt v23.05.5-r24106
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="settings-row-item">
+                    <div className="settings-row-info">
+                      <span className="settings-row-label">Gateway IP Address</span>
+                      <span className="settings-row-caption">Local IPv4 address of the OpenWrt management interface.</span>
+                    </div>
+                    <div className="settings-row-control">
+                      <input
+                        type="text"
+                        className="form-input-element"
+                        value={gatewayIp}
+                        onChange={(e) => setGatewayIp(e.target.value)}
+                        style={{ width: '160px', fontFamily: 'var(--font-mono)', fontSize: '0.82rem', padding: '0.4rem 0.65rem' }}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="settings-row-item">
+                    <div className="settings-row-info">
+                      <span className="settings-row-label">Sync Polling Interval</span>
+                      <span className="settings-row-caption">How often the router polls for new firewall and ethers updates.</span>
+                    </div>
+                    <div className="settings-row-control">
+                      <select
+                        className="group-dropdown-select"
+                        value={pollingInterval}
+                        onChange={(e) => setPollingInterval(e.target.value)}
+                        style={{ width: '170px', fontSize: '0.82rem' }}
+                      >
+                        <option value="5">Every 5 seconds</option>
+                        <option value="10">Every 10 seconds (Default)</option>
+                        <option value="30">Every 30 seconds</option>
+                        <option value="60">Every 1 minute</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* SECTION 2: Firewall Security & Access Rules */}
+              <div className="settings-section-card">
+                <div className="settings-section-header">
+                  <div className="settings-section-title-wrap">
+                    <h2 className="settings-section-title">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                      </svg>
+                      Firewall &amp; Access Control Policies
+                    </h2>
+                    <p className="settings-section-desc">
+                      Low-level packet filter parameters applied to `/etc/config/firewall`.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="settings-rows-list">
+                  <div className="settings-row-item">
+                    <div className="settings-row-info">
+                      <span className="settings-row-label">No-Internet Block Action</span>
+                      <span className="settings-row-caption">
+                        Action taken when a device in a &quot;No Internet&quot; group tries to access the WAN.
+                      </span>
+                    </div>
+                    <div className="settings-row-control">
+                      <select
+                        className="group-dropdown-select"
+                        value={blockPolicy}
+                        onChange={(e: any) => setBlockPolicy(e.target.value)}
+                        style={{ width: '180px', fontSize: '0.82rem' }}
+                      >
+                        <option value="REJECT">REJECT (Immediate TCP RST)</option>
+                        <option value="DROP">DROP (Silent timeout)</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="settings-row-item">
+                    <div className="settings-row-info">
+                      <span className="settings-row-label">SYN Flood Protection</span>
+                      <span className="settings-row-caption">Enforce syn_flood protection against denial-of-service attempts.</span>
+                    </div>
+                    <div className="settings-row-control">
+                      <label className="switch-toggle-label">
+                        <input
+                          type="checkbox"
+                          className="switch-toggle-input"
+                          checked={synFloodEnabled}
+                          onChange={(e) => setSynFloodEnabled(e.target.checked)}
+                        />
+                        <span className="switch-toggle-slider"></span>
+                      </label>
+                    </div>
+                  </div>
+
+                  <div className="settings-row-item">
+                    <div className="settings-row-info">
+                      <span className="settings-row-label">Hardware &amp; Software Flow Offloading</span>
+                      <span className="settings-row-caption">Bypass CPU routing table for established high-bandwidth streams.</span>
+                    </div>
+                    <div className="settings-row-control">
+                      <label className="switch-toggle-label">
+                        <input
+                          type="checkbox"
+                          className="switch-toggle-input"
+                          checked={flowOffloadingEnabled}
+                          onChange={(e) => setFlowOffloadingEnabled(e.target.checked)}
+                        />
+                        <span className="switch-toggle-slider"></span>
+                      </label>
+                    </div>
+                  </div>
+
+                  <div className="settings-row-item">
+                    <div className="settings-row-info">
+                      <span className="settings-row-label">Fullcone NAT Acceleration</span>
+                      <span className="settings-row-caption">Improves peer-to-peer networking, gaming latency, and VoIP connections.</span>
+                    </div>
+                    <div className="settings-row-control">
+                      <label className="switch-toggle-label">
+                        <input
+                          type="checkbox"
+                          className="switch-toggle-input"
+                          checked={fullconeNatEnabled}
+                          onChange={(e) => setFullconeNatEnabled(e.target.checked)}
+                        />
+                        <span className="switch-toggle-slider"></span>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* SECTION 3: API Endpoints & Secret Token */}
+              <div className="settings-section-card">
+                <div className="settings-section-header">
+                  <div className="settings-section-title-wrap">
+                    <h2 className="settings-section-title">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <polyline points="16 18 22 12 16 6"/>
+                        <polyline points="8 6 2 12 8 18"/>
+                      </svg>
+                      Router API Endpoints &amp; Authentication
+                    </h2>
+                    <p className="settings-section-desc">
+                      Endpoints consumed by OpenWrt shell scripts to pull configuration files.
+                    </p>
+                  </div>
+                </div>
+
+                <div style={{ marginBottom: '1.25rem' }}>
+                  <label className="form-label-title">Router Secret Bearer Token</label>
+                  <div style={{ display: 'flex', gap: '0.65rem', alignItems: 'center', marginTop: '0.35rem', flexWrap: 'wrap' }}>
+                    <input
+                      type={showSecretToken ? 'text' : 'password'}
+                      readOnly
+                      value="openwrt-secret-token-change-in-production"
+                      className="form-input-element"
+                      style={{ maxWidth: '380px', fontFamily: 'var(--font-mono)', fontSize: '0.82rem' }}
+                    />
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={() => setShowSecretToken(!showSecretToken)}
+                      style={{ fontSize: '0.8rem', padding: '0.45rem 0.8rem' }}
+                    >
+                      {showSecretToken ? 'Hide' : 'Reveal'}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={() => handleCopyText('openwrt-secret-token-change-in-production', 'token')}
+                      style={{ fontSize: '0.8rem', padding: '0.45rem 0.8rem' }}
+                    >
+                      {tokenCopied ? '✓ Copied' : 'Copy Token'}
+                    </button>
+                  </div>
+                  <div className="form-help-caption">Pass this token in HTTP header <code>Authorization: Bearer &lt;token&gt;</code> for router requests.</div>
+                </div>
+
+                <div className="endpoints-table-container">
+                  <div className="endpoint-list-row">
+                    <div className="endpoint-badge-col">
+                      <span className="endpoint-badge-method">GET</span>
+                      <div>
+                        <span className="endpoint-path-text">/api/config/version</span>
+                        <div className="endpoint-desc-text">Returns current configuration version &amp; hash for router cron polling.</div>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      className="btn-text-action"
+                      onClick={() => handleCopyText('/api/config/version', 'endpoint')}
+                    >
+                      Copy Path
+                    </button>
+                  </div>
+
+                  <div className="endpoint-list-row">
+                    <div className="endpoint-badge-col">
+                      <span className="endpoint-badge-method">GET</span>
+                      <div>
+                        <span className="endpoint-path-text">/api/config/firewall</span>
+                        <div className="endpoint-desc-text">Generates UCI firewall rules with Allowed and Blocked (No-Internet) sections.</div>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <a
+                        href="/api/config/firewall?download=true"
+                        download="firewall"
+                        className="btn-text-action"
+                        style={{ textDecoration: 'none' }}
+                      >
+                        Download
+                      </a>
+                      <button
+                        type="button"
+                        className="btn-text-action"
+                        onClick={() => handleCopyText('/api/config/firewall', 'endpoint')}
+                      >
+                        Copy
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="endpoint-list-row">
+                    <div className="endpoint-badge-col">
+                      <span className="endpoint-badge-method">GET</span>
+                      <div>
+                        <span className="endpoint-path-text">/api/config/ethers</span>
+                        <div className="endpoint-desc-text">Generates static DHCP hostname and MAC mappings for `/etc/ethers`.</div>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <a
+                        href="/api/config/ethers?download=true"
+                        download="ethers"
+                        className="btn-text-action"
+                        style={{ textDecoration: 'none' }}
+                      >
+                        Download
+                      </a>
+                      <button
+                        type="button"
+                        className="btn-text-action"
+                        onClick={() => handleCopyText('/api/config/ethers', 'endpoint')}
+                      >
+                        Copy
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* SECTION 4: Appearance & Theme Preferences */}
+              <div className="settings-section-card">
+                <div className="settings-section-header">
+                  <div className="settings-section-title-wrap">
+                    <h2 className="settings-section-title">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <circle cx="12" cy="12" r="5"/>
+                        <line x1="12" y1="1" x2="12" y2="3"/>
+                        <line x1="12" y1="21" x2="12" y2="23"/>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+                        <line x1="1" y1="12" x2="3" y2="12"/>
+                        <line x1="21" y1="12" x2="23" y2="12"/>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+                      </svg>
+                      Appearance &amp; Theme
+                    </h2>
+                    <p className="settings-section-desc">
+                      Customize interface themes with instant application and zero flash.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="theme-picker-cards">
+                  <button
+                    type="button"
+                    className={`theme-card-btn ${theme === 'light' ? 'active' : ''}`}
+                    onClick={() => switchTheme('light')}
+                  >
+                    <div className="theme-card-preview-bar" style={{ background: '#fafafa', border: '1px solid #e5e7eb' }}>
+                      <div style={{ width: '30%', background: '#ffffff', borderRight: '1px solid #e5e7eb' }}></div>
+                      <div style={{ flex: 1, padding: '4px' }}>
+                        <div style={{ height: '6px', width: '60%', background: '#111111', borderRadius: '2px', marginBottom: '3px' }}></div>
+                        <div style={{ height: '4px', width: '40%', background: '#d1d5db', borderRadius: '2px' }}></div>
+                      </div>
+                    </div>
+                    <div>
+                      <div className="theme-card-title">Light Mode</div>
+                      <div className="theme-card-desc">Clean monochrome SaaS aesthetic</div>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    className={`theme-card-btn ${theme === 'dark' ? 'active' : ''}`}
+                    onClick={() => switchTheme('dark')}
+                  >
+                    <div className="theme-card-preview-bar" style={{ background: '#050505', border: '1px solid #242424' }}>
+                      <div style={{ width: '30%', background: '#09090b', borderRight: '1px solid #242424' }}></div>
+                      <div style={{ flex: 1, padding: '4px' }}>
+                        <div style={{ height: '6px', width: '60%', background: '#ffffff', borderRadius: '2px', marginBottom: '3px' }}></div>
+                        <div style={{ height: '4px', width: '40%', background: '#333333', borderRadius: '2px' }}></div>
+                      </div>
+                    </div>
+                    <div>
+                      <div className="theme-card-title">Dark Mode</div>
+                      <div className="theme-card-desc">High-contrast midnight theme</div>
+                    </div>
+                  </button>
+                </div>
+              </div>
+
+              {/* SECTION 5: Backup & Maintenance */}
+              <div className="settings-section-card">
+                <div className="settings-section-header">
+                  <div className="settings-section-title-wrap">
+                    <h2 className="settings-section-title">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                        <polyline points="7 10 12 15 17 10"/>
+                        <line x1="12" y1="15" x2="12" y2="3"/>
+                      </svg>
+                      System Maintenance &amp; Backup
+                    </h2>
+                    <p className="settings-section-desc">
+                      Archive configuration snapshots, download JSON backups, and view deployment audit logs.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="settings-rows-list">
+                  <div className="settings-row-item">
+                    <div className="settings-row-info">
+                      <span className="settings-row-label">Configuration History</span>
+                      <span className="settings-row-caption">View the chronological audit log of all applied gateway versions.</span>
+                    </div>
+                    <div className="settings-row-control">
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        onClick={openHistoryModal}
+                      >
+                        View Version History
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="settings-row-item">
+                    <div className="settings-row-info">
+                      <span className="settings-row-label">Export System Snapshot (JSON)</span>
+                      <span className="settings-row-caption">Download a full JSON backup of all registered devices, groups, and tags.</span>
+                    </div>
+                    <div className="settings-row-control">
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        onClick={handleExportConfig}
+                      >
+                        Download Backup
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </main>
       </div>
 
@@ -1983,55 +2727,150 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Settings Modal */}
-      {showSettingsModal && (
+      {/* MAC Authentication Schedule / Disable Modal */}
+      {showMacAuthModal && (
         <div className="modal-backdrop">
-          <div className="modal-card">
+          <div className="mac-auth-modal-card">
             <div className="modal-header-row">
-              <h3 className="modal-headline">Gateway Settings</h3>
-              <button onClick={() => setShowSettingsModal(false)} className="modal-close-icon">
+              <h3 className="modal-headline" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span>🔓</span>
+                <span>Turn OFF MAC Authentication</span>
+              </h3>
+              <button
+                onClick={() => setShowMacAuthModal(false)}
+                className="modal-close-icon"
+                disabled={isUpdatingMacAuth}
+              >
                 ✕
               </button>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', fontSize: '0.86rem' }}>
-              <div>
-                <span className="form-label-title">Router Sync Status</span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.25rem' }}>
-                  <span className="status-indicator-dot"></span>
-                  <span style={{ fontWeight: 600 }}>Connected & Polling</span>
-                </div>
-              </div>
+            <div style={{ fontSize: '0.84rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+              Turning off MAC authentication sets firewall forwarding to <code>lan ➔ wan</code>, allowing <strong>everyone on the local network</strong> to access the internet freely without MAC registration.
+            </div>
 
-              <div>
-                <span className="form-label-title">Router Version</span>
-                <div style={{ color: 'var(--text-secondary)' }}>OpenWrt v23.05.5-r24106</div>
-              </div>
+            {macAuthModalError && (
+              <div className="form-alert-msg">{macAuthModalError}</div>
+            )}
 
-              <div>
-                <span className="form-label-title">Configuration Endpoints</span>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', marginTop: '0.35rem' }}>
-                  <code style={{ fontSize: '0.75rem', background: 'var(--bg-pill)', padding: '0.3rem 0.6rem', borderRadius: '4px' }}>
-                    GET /api/config/version
-                  </code>
-                  <code style={{ fontSize: '0.75rem', background: 'var(--bg-pill)', padding: '0.3rem 0.6rem', borderRadius: '4px' }}>
-                    GET /api/config/firewall
-                  </code>
-                  <code style={{ fontSize: '0.75rem', background: 'var(--bg-pill)', padding: '0.3rem 0.6rem', borderRadius: '4px' }}>
-                    GET /api/config/ethers
-                  </code>
-                </div>
+            <div>
+              <label className="form-label-title">Select Disable Duration / Schedule</label>
+              <div className="mac-auth-duration-grid">
+                <button
+                  type="button"
+                  className={`mac-auth-duration-btn ${macAuthDisableMode === 'infinite' ? 'active' : ''}`}
+                  disabled={currentUser?.role !== 'admin'}
+                  onClick={() => setMacAuthDisableMode('infinite')}
+                  title={currentUser?.role !== 'admin' ? 'Only Administrators can permanently disable MAC authentication' : 'Disable permanently until manually re-enabled'}
+                >
+                  <span style={{ fontSize: '1.1rem' }}>♾️</span>
+                  <span>Permanently</span>
+                  <span className="duration-caption">
+                    {currentUser?.role === 'admin' ? 'Admin only' : 'Locked for subadmin'}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  className={`mac-auth-duration-btn ${macAuthDisableMode === '1hour' ? 'active' : ''}`}
+                  onClick={() => setMacAuthDisableMode('1hour')}
+                >
+                  <span style={{ fontSize: '1.1rem' }}>⏱️</span>
+                  <span>1 Hour</span>
+                  <span className="duration-caption">Quick bypass</span>
+                </button>
+
+                <button
+                  type="button"
+                  className={`mac-auth-duration-btn ${macAuthDisableMode === '1day' ? 'active' : ''}`}
+                  onClick={() => setMacAuthDisableMode('1day')}
+                >
+                  <span style={{ fontSize: '1.1rem' }}>📅</span>
+                  <span>24 Hours</span>
+                  <span className="duration-caption">1 day</span>
+                </button>
+
+                <button
+                  type="button"
+                  className={`mac-auth-duration-btn ${macAuthDisableMode === '7days' ? 'active' : ''}`}
+                  onClick={() => setMacAuthDisableMode('7days')}
+                >
+                  <span style={{ fontSize: '1.1rem' }}>🗓️</span>
+                  <span>7 Days</span>
+                  <span className="duration-caption">1 week</span>
+                </button>
+
+                <button
+                  type="button"
+                  className={`mac-auth-duration-btn ${macAuthDisableMode === '30days' ? 'active' : ''}`}
+                  onClick={() => setMacAuthDisableMode('30days')}
+                >
+                  <span style={{ fontSize: '1.1rem' }}>📆</span>
+                  <span>30 Days</span>
+                  <span className="duration-caption">Max subadmin limit</span>
+                </button>
+
+                <button
+                  type="button"
+                  className={`mac-auth-duration-btn ${macAuthDisableMode === 'custom' ? 'active' : ''}`}
+                  onClick={() => setMacAuthDisableMode('custom')}
+                >
+                  <span style={{ fontSize: '1.1rem' }}>📅</span>
+                  <span>Pick Date</span>
+                  <span className="duration-caption">Calendar</span>
+                </button>
               </div>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1.75rem' }}>
-              <button className="btn btn-secondary" onClick={() => setShowSettingsModal(false)}>
-                Close
+            {macAuthDisableMode === 'custom' && (
+              <div className="mac-auth-custom-calendar-box">
+                <label className="form-label-title" style={{ fontSize: '0.78rem' }}>
+                  Specify End Date &amp; Time:
+                </label>
+                <input
+                  type="datetime-local"
+                  className="form-input-element"
+                  value={customMacAuthDate}
+                  onChange={(e) => setCustomMacAuthDate(e.target.value)}
+                  min={new Date(Date.now() + 60000).toISOString().slice(0, 16)}
+                  max={
+                    currentUser?.role === 'subadmin'
+                      ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 16)
+                      : undefined
+                  }
+                  style={{ fontSize: '0.84rem' }}
+                />
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+                  {currentUser?.role === 'subadmin'
+                    ? 'Subadmins may schedule up to a maximum of 30 days into the future.'
+                    : 'Select any future timestamp when MAC filtering should automatically resume.'}
+                </div>
+              </div>
+            )}
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.75rem' }}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                disabled={isUpdatingMacAuth}
+                onClick={() => setShowMacAuthModal(false)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                disabled={isUpdatingMacAuth}
+                onClick={handleConfirmDisableMacAuth}
+              >
+                {isUpdatingMacAuth ? 'Applying...' : 'Confirm & Turn OFF'}
               </button>
             </div>
           </div>
         </div>
       )}
+
+
 
       {/* Multi-Group Conflict Modal (No Internet Group Tagging) */}
       {conflictModalData && (

@@ -52,7 +52,7 @@ export async function GET(request: Request) {
         is_no_internet: Boolean(uGroups.some((g) => g.is_no_internet)),
       };
     });
-    content = generateFirewallConfig(mapped);
+    content = generateFirewallConfig(mapped, state.mockMacAuth.enabled);
   }
 
   return new Response(content, {

@@ -101,12 +101,19 @@ export interface ApplyResult {
   error?: string;
 }
 
+export interface MacAuthSettings {
+  enabled: boolean; // true = destination 'unspecified' (MAC auth ON), false = destination 'wan' (MAC auth OFF, open to all)
+  disabled_until: string | null; // ISO string if temporarily disabled, null if permanently
+  disabled_by_role?: AccountRole;
+}
+
 export interface DashboardStats {
   total_users: number;
   total_groups: number;
   pending_changes: number;
   current_version: number | null;
   last_applied: string | null;
+  mac_auth?: MacAuthSettings;
 }
 
 // View model for the user table (combines applied state + draft state)
@@ -118,3 +125,4 @@ export interface UserViewModel {
   status: 'applied' | 'added' | 'modified' | 'deleted';
   draft_change_id?: string;
 }
+

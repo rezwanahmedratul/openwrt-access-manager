@@ -172,6 +172,7 @@ export async function GET(request: Request) {
       pending_changes: draftChanges.length,
       current_version: currentVersion,
       last_applied: lastApplied,
+      mac_auth: mock.mockMacAuth,
     },
     draft_changes: draftChanges,
   });

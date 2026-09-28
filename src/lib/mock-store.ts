@@ -1,4 +1,4 @@
-import { UserWithGroups, Group, DraftChange, Account } from './types';
+import { UserWithGroups, Group, DraftChange, Account, MacAuthSettings } from './types';
 
 let mockAccounts: Account[] = [
   {
@@ -63,7 +63,26 @@ let mockDraftChanges: DraftChange[] = [];
 let mockVersion = 1;
 let mockLastApplied: string | null = new Date(Date.now() - 86400000).toISOString();
 
+let mockMacAuth: MacAuthSettings = {
+  enabled: true, // true = MAC auth ON (forwarding dest 'unspecified')
+  disabled_until: null,
+};
+
 export function getMockState() {
+  // Auto-check if temporary disable duration has passed
+  if (!mockMacAuth.enabled && mockMacAuth.disabled_until) {
+    const expiry = new Date(mockMacAuth.disabled_until).getTime();
+    if (Date.now() >= expiry) {
+      mockMacAuth = {
+        enabled: true,
+        disabled_until: null,
+      };
+      // Bump version so router polling (/api/config/version) immediately sees a change and updates /etc/config/firewall
+      mockVersion += 1;
+      mockLastApplied = new Date().toISOString();
+    }
+  }
+
   return {
     mockAccounts,
     mockUsers,
@@ -71,11 +90,14 @@ export function getMockState() {
     mockDraftChanges,
     mockVersion,
     mockLastApplied,
+    mockMacAuth,
     setMockAccounts: (a: Account[]) => { mockAccounts = a; },
     setMockUsers: (u: UserWithGroups[]) => { mockUsers = u; },
     setMockGroups: (g: Group[]) => { mockGroups = g; },
     setMockDraftChanges: (d: DraftChange[]) => { mockDraftChanges = d; },
     setMockVersion: (v: number) => { mockVersion = v; },
     setMockLastApplied: (l: string) => { mockLastApplied = l; },
+    setMockMacAuth: (m: MacAuthSettings) => { mockMacAuth = m; },
   };
 }
+
