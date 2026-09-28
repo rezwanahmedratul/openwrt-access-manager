@@ -38,8 +38,16 @@ export async function POST() {
 
           if (userError) throw userError;
 
-          if (change.user_data.group_ids && change.user_data.group_ids.length > 0) {
-            const junctionRows = change.user_data.group_ids.map((gid: string) => ({
+          let groupIdsToInsert = change.user_data.group_ids || [];
+          if (groupIdsToInsert.length === 0) {
+            const { data: defGroup } = await supabase.from('groups').select('id').ilike('name', 'Default').maybeSingle();
+            if (defGroup?.id) {
+              groupIdsToInsert = [defGroup.id];
+            }
+          }
+
+          if (groupIdsToInsert.length > 0) {
+            const junctionRows = groupIdsToInsert.map((gid: string) => ({
               user_id: newUser.id,
               group_id: gid,
             }));
@@ -56,8 +64,17 @@ export async function POST() {
             .eq('id', change.user_id);
 
           await supabase.from('user_groups').delete().eq('user_id', change.user_id);
-          if (change.user_data.group_ids && change.user_data.group_ids.length > 0) {
-            const junctionRows = change.user_data.group_ids.map((gid: string) => ({
+
+          let groupIdsToInsert = change.user_data.group_ids || [];
+          if (groupIdsToInsert.length === 0) {
+            const { data: defGroup } = await supabase.from('groups').select('id').ilike('name', 'Default').maybeSingle();
+            if (defGroup?.id) {
+              groupIdsToInsert = [defGroup.id];
+            }
+          }
+
+          if (groupIdsToInsert.length > 0) {
+            const junctionRows = groupIdsToInsert.map((gid: string) => ({
               user_id: change.user_id,
               group_id: gid,
             }));
@@ -127,11 +144,20 @@ export async function POST() {
       return NextResponse.json({ error: 'No pending changes to apply' }, { status: 400 });
     }
 
+    let defaultGroup = state.mockGroups.find((g) => g.name.toLowerCase() === 'default');
+    if (!defaultGroup) {
+      defaultGroup = { id: 'g-default', name: 'Default', created_at: '', updated_at: '' };
+      state.setMockGroups([defaultGroup, ...state.mockGroups]);
+    }
+
     let updatedUsers = [...state.mockUsers];
 
     for (const change of state.mockDraftChanges) {
       if (change.operation === 'ADD' && change.user_data) {
-        const assignedGroups = state.mockGroups.filter((g) => change.user_data?.group_ids?.includes(g.id));
+        let assignedGroups = state.mockGroups.filter((g) => change.user_data?.group_ids?.includes(g.id));
+        if (assignedGroups.length === 0 && defaultGroup) {
+          assignedGroups = [defaultGroup];
+        }
         updatedUsers.push({
           id: 'user-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5),
           name: change.user_data.name,
@@ -141,7 +167,10 @@ export async function POST() {
           groups: assignedGroups,
         });
       } else if (change.operation === 'MODIFY' && change.user_id && change.user_data) {
-        const assignedGroups = state.mockGroups.filter((g) => change.user_data?.group_ids?.includes(g.id));
+        let assignedGroups = state.mockGroups.filter((g) => change.user_data?.group_ids?.includes(g.id));
+        if (assignedGroups.length === 0 && defaultGroup) {
+          assignedGroups = [defaultGroup];
+        }
         updatedUsers = updatedUsers.map((u) => {
           if (u.id === change.user_id) {
             return {

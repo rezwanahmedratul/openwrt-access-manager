@@ -2,6 +2,23 @@
 // Core Types for OpenWrt Access Manager
 // ============================================================
 
+export type AccountRole = 'admin' | 'subadmin';
+
+export interface Account {
+  id: string;
+  username: string;
+  password_hash?: string;
+  role: AccountRole;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SessionUser {
+  id: string;
+  username: string;
+  role: AccountRole;
+}
+
 export interface User {
   id: string;
   name: string;
@@ -13,6 +30,7 @@ export interface User {
 export interface Group {
   id: string;
   name: string;
+  is_protected?: boolean;
   created_at: string;
   updated_at: string;
 }

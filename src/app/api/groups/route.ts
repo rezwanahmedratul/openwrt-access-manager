@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServiceSupabase } from '@/lib/supabase';
 import { getMockState } from '@/lib/mock-store';
 import { Group } from '@/lib/types';
+import { getSessionFromRequest } from '@/lib/auth';
 
 // GET all groups
 export async function GET() {
@@ -25,14 +26,21 @@ export async function GET() {
 // POST create group
 export async function POST(request: Request) {
   try {
+    const session = getSessionFromRequest(request);
     const body = await request.json();
-    const { name } = body;
+    const { name, is_protected } = body;
 
     if (!name || typeof name !== 'string' || !name.trim()) {
       return NextResponse.json({ error: 'Group name is required' }, { status: 400 });
     }
 
     const trimmedName = name.trim();
+    const shouldProtect = Boolean(is_protected);
+
+    // Only admin can create protected groups
+    if (shouldProtect && session && session.role !== 'admin') {
+      return NextResponse.json({ error: 'Only administrators can create protected groups.' }, { status: 403 });
+    }
 
     const supabase = getServiceSupabase();
     const isSupabaseConfigured = Boolean(
@@ -53,7 +61,7 @@ export async function POST(request: Request) {
 
       const { data, error } = await supabase
         .from('groups')
-        .insert({ name: trimmedName })
+        .insert({ name: trimmedName, is_protected: shouldProtect })
         .select()
         .single();
 
@@ -74,6 +82,7 @@ export async function POST(request: Request) {
       const newGroup: Group = {
         id: 'group-' + Date.now(),
         name: trimmedName,
+        is_protected: shouldProtect,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
@@ -236,6 +245,69 @@ export async function DELETE(request: Request) {
         success: true,
         message: `Group deleted. Users successfully reassigned to "${defaultGroup.name}".`,
       });
+    }
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message || 'Server error' }, { status: 500 });
+  }
+}
+
+// PATCH toggle group protection or rename (Admin only for protected groups)
+export async function PATCH(request: Request) {
+  try {
+    const session = getSessionFromRequest(request);
+    const body = await request.json();
+    const { id, is_protected, name } = body;
+
+    if (!id) {
+      return NextResponse.json({ error: 'Group ID is required' }, { status: 400 });
+    }
+
+    if (is_protected !== undefined && session && session.role !== 'admin') {
+      return NextResponse.json({ error: 'Only administrators can change group protection status.' }, { status: 403 });
+    }
+
+    const supabase = getServiceSupabase();
+    const isSupabaseConfigured = Boolean(
+      process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_URL.startsWith('http')
+    );
+
+    if (isSupabaseConfigured) {
+      const updateData: any = { updated_at: new Date().toISOString() };
+      if (is_protected !== undefined) updateData.is_protected = Boolean(is_protected);
+      if (name && typeof name === 'string') updateData.name = name.trim();
+
+      const { data, error } = await supabase
+        .from('groups')
+        .update(updateData)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ success: true, group: data });
+    } else {
+      const state = getMockState();
+      let updatedGroup: Group | null = null;
+
+      const newGroups = state.mockGroups.map((g) => {
+        if (g.id === id) {
+          updatedGroup = {
+            ...g,
+            is_protected: is_protected !== undefined ? Boolean(is_protected) : g.is_protected,
+            name: name && typeof name === 'string' ? name.trim() : g.name,
+            updated_at: new Date().toISOString(),
+          };
+          return updatedGroup;
+        }
+        return g;
+      });
+
+      if (!updatedGroup) {
+        return NextResponse.json({ error: 'Group not found' }, { status: 404 });
+      }
+
+      state.setMockGroups(newGroups);
+      return NextResponse.json({ success: true, group: updatedGroup });
     }
   } catch (err: any) {
     return NextResponse.json({ error: err.message || 'Server error' }, { status: 500 });

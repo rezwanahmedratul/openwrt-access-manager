@@ -1,4 +1,23 @@
-import { UserWithGroups, Group, DraftChange } from './types';
+import { UserWithGroups, Group, DraftChange, Account } from './types';
+
+let mockAccounts: Account[] = [
+  {
+    id: 'acc-admin',
+    username: 'admin',
+    password_hash: 'admin123',
+    role: 'admin',
+    created_at: new Date(Date.now() - 86400000 * 15).toISOString(),
+    updated_at: new Date(Date.now() - 86400000 * 15).toISOString(),
+  },
+  {
+    id: 'acc-subadmin',
+    username: 'subadmin',
+    password_hash: 'subadmin123',
+    role: 'subadmin',
+    created_at: new Date(Date.now() - 86400000 * 5).toISOString(),
+    updated_at: new Date(Date.now() - 86400000 * 5).toISOString(),
+  },
+];
 
 let mockUsers: UserWithGroups[] = [
   {
@@ -8,8 +27,8 @@ let mockUsers: UserWithGroups[] = [
     created_at: new Date(Date.now() - 86400000 * 5).toISOString(),
     updated_at: new Date(Date.now() - 86400000 * 5).toISOString(),
     groups: [
-      { id: 'g1', name: 'Family', created_at: '', updated_at: '' },
-      { id: 'g3', name: 'Students', created_at: '', updated_at: '' },
+      { id: 'g1', name: 'Family', is_protected: false, created_at: '', updated_at: '' },
+      { id: 'g3', name: 'Students', is_protected: false, created_at: '', updated_at: '' },
     ],
   },
   {
@@ -18,7 +37,7 @@ let mockUsers: UserWithGroups[] = [
     mac_address: '48:2C:A0:9C:D6:87',
     created_at: new Date(Date.now() - 86400000 * 4).toISOString(),
     updated_at: new Date(Date.now() - 86400000 * 4).toISOString(),
-    groups: [{ id: 'g2', name: 'Friends', created_at: '', updated_at: '' }],
+    groups: [{ id: 'g2', name: 'Friends', is_protected: false, created_at: '', updated_at: '' }],
   },
   {
     id: '3',
@@ -26,18 +45,18 @@ let mockUsers: UserWithGroups[] = [
     mac_address: '3C:84:6A:48:01:DC',
     created_at: new Date(Date.now() - 86400000 * 3).toISOString(),
     updated_at: new Date(Date.now() - 86400000 * 3).toISOString(),
-    groups: [{ id: 'g5', name: 'Devices', created_at: '', updated_at: '' }],
+    groups: [{ id: 'g5', name: 'Devices', is_protected: true, created_at: '', updated_at: '' }],
   },
 ];
 
 let mockGroups: Group[] = [
-  { id: 'g-default', name: 'Default', created_at: '', updated_at: '' },
-  { id: 'g1', name: 'Family', created_at: '', updated_at: '' },
-  { id: 'g2', name: 'Friends', created_at: '', updated_at: '' },
-  { id: 'g3', name: 'Students', created_at: '', updated_at: '' },
-  { id: 'g4', name: 'Guests', created_at: '', updated_at: '' },
-  { id: 'g5', name: 'Devices', created_at: '', updated_at: '' },
-  { id: 'g6', name: 'Others', created_at: '', updated_at: '' },
+  { id: 'g-default', name: 'Default', is_protected: false, created_at: '', updated_at: '' },
+  { id: 'g1', name: 'Family', is_protected: false, created_at: '', updated_at: '' },
+  { id: 'g2', name: 'Friends', is_protected: false, created_at: '', updated_at: '' },
+  { id: 'g3', name: 'Students', is_protected: false, created_at: '', updated_at: '' },
+  { id: 'g4', name: 'Guests', is_protected: false, created_at: '', updated_at: '' },
+  { id: 'g5', name: 'Devices', is_protected: true, created_at: '', updated_at: '' },
+  { id: 'g6', name: 'Others', is_protected: false, created_at: '', updated_at: '' },
 ];
 
 let mockDraftChanges: DraftChange[] = [];
@@ -46,11 +65,13 @@ let mockLastApplied: string | null = new Date(Date.now() - 86400000).toISOString
 
 export function getMockState() {
   return {
+    mockAccounts,
     mockUsers,
     mockGroups,
     mockDraftChanges,
     mockVersion,
     mockLastApplied,
+    setMockAccounts: (a: Account[]) => { mockAccounts = a; },
     setMockUsers: (u: UserWithGroups[]) => { mockUsers = u; },
     setMockGroups: (g: Group[]) => { mockGroups = g; },
     setMockDraftChanges: (d: DraftChange[]) => { mockDraftChanges = d; },

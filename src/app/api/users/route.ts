@@ -30,7 +30,7 @@ export async function GET(request: Request) {
           id, name, mac_address, created_at, updated_at,
           user_groups (
             group_id,
-            groups ( id, name, created_at, updated_at )
+            groups ( id, name, is_protected, created_at, updated_at )
           )
         `)
         .order('name');
@@ -79,14 +79,22 @@ export async function GET(request: Request) {
     lastApplied = mock.mockLastApplied;
   }
 
+  // Ensure Default group always exists
+  let defaultGroup = groups.find((g) => g.name.toLowerCase() === 'default');
+  if (!defaultGroup) {
+    defaultGroup = { id: 'g-default', name: 'Default', is_protected: false, created_at: '', updated_at: '' };
+    groups = [defaultGroup, ...groups];
+  }
+
   const viewMap = new Map<string, UserViewModel>();
 
   for (const u of appliedUsers) {
+    const userGroups = u.groups && u.groups.length > 0 ? u.groups : [defaultGroup];
     viewMap.set(u.id, {
       id: u.id,
       name: u.name,
       mac_address: u.mac_address,
-      groups: u.groups,
+      groups: userGroups,
       status: 'applied',
     });
   }
@@ -95,11 +103,12 @@ export async function GET(request: Request) {
     if (change.operation === 'ADD') {
       const tempId = `draft-add-${change.id}`;
       const changeGroups = groups.filter((g) => change.user_data?.group_ids?.includes(g.id));
+      const finalChangeGroups = changeGroups.length > 0 ? changeGroups : [defaultGroup];
       viewMap.set(tempId, {
         id: tempId,
         name: change.user_data?.name || '',
         mac_address: change.user_data?.mac_address || '',
-        groups: changeGroups,
+        groups: finalChangeGroups,
         status: 'added',
         draft_change_id: change.id,
       });
@@ -107,11 +116,12 @@ export async function GET(request: Request) {
       const existing = viewMap.get(change.user_id);
       if (existing) {
         const changeGroups = groups.filter((g) => change.user_data?.group_ids?.includes(g.id));
+        const finalChangeGroups = changeGroups.length > 0 ? changeGroups : [defaultGroup];
         viewMap.set(change.user_id, {
           ...existing,
           name: change.user_data?.name || existing.name,
           mac_address: change.user_data?.mac_address || existing.mac_address,
-          groups: changeGroups,
+          groups: finalChangeGroups,
           status: 'modified',
           draft_change_id: change.id,
         });
@@ -147,11 +157,7 @@ export async function GET(request: Request) {
   }
 
   if (groupFilter && groupFilter !== 'ALL') {
-    if (groupFilter === 'UNGROUPED') {
-      finalUsers = finalUsers.filter((u) => u.groups.length === 0);
-    } else {
-      finalUsers = finalUsers.filter((u) => u.groups.some((g) => g.id === groupFilter || g.name.toLowerCase() === groupFilter.toLowerCase()));
-    }
+    finalUsers = finalUsers.filter((u) => u.groups.some((g) => g.id === groupFilter || g.name.toLowerCase() === groupFilter.toLowerCase()));
   }
 
   return NextResponse.json({
