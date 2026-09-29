@@ -23,7 +23,7 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 
 # Increase heap to prevent OOM during bundling
-RUN NODE_OPTIONS="--max-old-space-size=2048" npx --no-install next build
+RUN NODE_OPTIONS="--max-old-space-size=2048" npm run build
 
 # Stage 2: Minimal Production Runtime
 FROM node:20-slim AS runner
