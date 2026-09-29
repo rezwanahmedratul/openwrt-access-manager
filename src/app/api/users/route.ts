@@ -5,6 +5,8 @@ import { normalizeMac } from '@/lib/normalize-mac';
 import { getMockState } from '@/lib/mock-store';
 import { cacheGet, cacheSet } from '@/lib/cache';
 
+export const dynamic = 'force-dynamic';
+
 const USERS_CACHE_KEY = 'cache:users:raw';
 const USERS_CACHE_TTL = 30; // 30 seconds TTL, invalidated on mutations
 
@@ -30,7 +32,6 @@ export async function GET(request: Request) {
   if (rawData) {
     cacheHit = true;
   } else {
-    const supabase = getServiceSupabase();
     const isSupabaseConfigured = Boolean(
       process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_URL.startsWith('http')
     );
@@ -40,14 +41,16 @@ export async function GET(request: Request) {
     let draftChanges: DraftChange[] = [];
     let currentVersion: number | null = null;
     let lastApplied: string | null = null;
+    let querySucceeded = false;
 
     if (isSupabaseConfigured) {
       try {
+        const supabase = getServiceSupabase();
         const [
-          { data: groupData },
-          { data: userData },
-          { data: changesData },
-          { data: configData },
+          groupRes,
+          userRes,
+          changesRes,
+          configRes,
         ] = await Promise.all([
           supabase.from('groups').select('*').order('name'),
           supabase
@@ -71,10 +74,15 @@ export async function GET(request: Request) {
             .maybeSingle(),
         ]);
 
-        groups = groupData || [];
+        if (groupRes.error) throw groupRes.error;
+        if (userRes.error) throw userRes.error;
+        if (changesRes.error) throw changesRes.error;
+        if (configRes.error && configRes.error.code !== 'PGRST116') throw configRes.error;
 
-        if (userData) {
-          appliedUsers = userData.map((u: any) => ({
+        groups = groupRes.data || [];
+
+        if (userRes.data) {
+          appliedUsers = userRes.data.map((u: any) => ({
             id: u.id,
             name: u.name,
             mac_address: u.mac_address,
@@ -84,12 +92,14 @@ export async function GET(request: Request) {
           }));
         }
 
-        draftChanges = changesData || [];
+        draftChanges = changesRes.data || [];
 
-        if (configData) {
-          currentVersion = configData.version;
-          lastApplied = configData.created_at;
+        if (configRes.data) {
+          currentVersion = configRes.data.version;
+          lastApplied = configRes.data.created_at;
         }
+
+        querySucceeded = true;
       } catch (e) {
         console.error('Supabase query error, falling back to mock:', e);
         appliedUsers = mock.mockUsers;
@@ -107,6 +117,7 @@ export async function GET(request: Request) {
       draftChanges = mock.mockDraftChanges;
       currentVersion = mock.mockVersion;
       lastApplied = mock.mockLastApplied;
+      querySucceeded = true;
     }
 
     rawData = {
@@ -117,8 +128,10 @@ export async function GET(request: Request) {
       lastApplied,
     };
 
-    // Store in cache asynchronously
-    await cacheSet(USERS_CACHE_KEY, rawData, USERS_CACHE_TTL);
+    // Only cache if the query actually succeeded
+    if (querySucceeded) {
+      await cacheSet(USERS_CACHE_KEY, rawData, USERS_CACHE_TTL);
+    }
   }
 
   const { appliedUsers, groups, draftChanges, currentVersion, lastApplied } = rawData;
