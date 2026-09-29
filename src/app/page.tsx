@@ -1462,13 +1462,13 @@ export default function DashboardPage() {
           </div>
 
           <div className="top-header-actions">
-            {/* Direct Configuration Downloads & History */}
-            <button className="btn btn-ghost btn-sm" onClick={openHistoryModal} style={{ fontSize: '0.8rem' }}>
+            {/* Direct Configuration Downloads & History (Desktop Only) */}
+            <button className="btn btn-ghost btn-sm desktop-only-action" onClick={openHistoryModal} style={{ fontSize: '0.8rem' }}>
               History
             </button>
             <a
               href="/api/config/firewall?download=true"
-              className="btn btn-ghost btn-sm"
+              className="btn btn-ghost btn-sm desktop-only-action"
               download="firewall"
               style={{ fontSize: '0.8rem' }}
             >
@@ -1476,7 +1476,7 @@ export default function DashboardPage() {
             </a>
             <a
               href="/api/config/ethers?download=true"
-              className="btn btn-ghost btn-sm"
+              className="btn btn-ghost btn-sm desktop-only-action"
               download="ethers"
               style={{ fontSize: '0.8rem' }}
             >
@@ -1584,6 +1584,51 @@ export default function DashboardPage() {
                       <span>Gateway Settings</span>
                     </button>
 
+                    <button
+                      type="button"
+                      className="user-dropdown-item"
+                      onClick={() => {
+                        setShowUserDropdown(false);
+                        openHistoryModal();
+                      }}
+                    >
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <circle cx="12" cy="12" r="10" />
+                        <polyline points="12 6 12 12 16 14" />
+                      </svg>
+                      <span>Configuration History</span>
+                    </button>
+
+                    <a
+                      href="/api/config/firewall?download=true"
+                      download="firewall"
+                      className="user-dropdown-item"
+                      onClick={() => setShowUserDropdown(false)}
+                      style={{ textDecoration: 'none' }}
+                    >
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                        <polyline points="7 10 12 15 17 10" />
+                        <line x1="12" y1="15" x2="12" y2="3" />
+                      </svg>
+                      <span>Download Firewall Config</span>
+                    </a>
+
+                    <a
+                      href="/api/config/ethers?download=true"
+                      download="ethers"
+                      className="user-dropdown-item"
+                      onClick={() => setShowUserDropdown(false)}
+                      style={{ textDecoration: 'none' }}
+                    >
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                        <polyline points="7 10 12 15 17 10" />
+                        <line x1="12" y1="15" x2="12" y2="3" />
+                      </svg>
+                      <span>Download Ethers Config</span>
+                    </a>
+
                     {currentUser?.role === 'admin' && (
                       <button
                         type="button"
@@ -1668,14 +1713,14 @@ export default function DashboardPage() {
                 </div>
                 <div className="actions-col" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
                   {stats.mac_auth && !stats.mac_auth.enabled ? (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.25)', padding: '0.4rem 0.85rem', borderRadius: 'var(--radius-md)' }}>
+                    <div className="header-mac-auth-badge" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.25)', padding: '0.4rem 0.85rem', borderRadius: 'var(--radius-md)' }}>
                       <span className="status-indicator-dot" style={{ background: '#ef4444' }}></span>
                       <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#ef4444' }}>
                         MAC Auth: OFF (Open{stats.mac_auth.disabled_until ? ` · Re-enables in ${macAuthCountdown || '...'} (${formatDateTime(stats.mac_auth.disabled_until)})` : ' permanently'})
                       </span>
                     </div>
                   ) : (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.25)', padding: '0.4rem 0.85rem', borderRadius: 'var(--radius-md)' }}>
+                    <div className="header-mac-auth-badge" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.25)', padding: '0.4rem 0.85rem', borderRadius: 'var(--radius-md)' }}>
                       <span className="status-indicator-dot" style={{ background: '#10b981' }}></span>
                       <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#10b981' }}>
                         MAC Auth: ON (Enforced)
@@ -1685,7 +1730,7 @@ export default function DashboardPage() {
 
                   <button
                     type="button"
-                    className={`btn ${stats.mac_auth && !stats.mac_auth.enabled ? 'btn-primary' : 'btn-secondary'}`}
+                    className={`btn header-mac-auth-btn ${stats.mac_auth && !stats.mac_auth.enabled ? 'btn-primary' : 'btn-secondary'}`}
                     disabled={isUpdatingMacAuth}
                     onClick={handleToggleMacAuthClick}
                     style={{ fontSize: '0.8rem', padding: '0.45rem 0.95rem', fontWeight: 600 }}
@@ -1964,8 +2009,8 @@ export default function DashboardPage() {
                       displayedUsers.map((u) => {
                         const isNoInternetUser = u.groups?.some((g) => g.is_no_internet);
                         return (
-                          <tr key={u.id} style={{ opacity: u.status === 'deleted' ? 0.4 : 1 }}>
-                            <td>
+                          <tr key={u.id} className="user-row-card" style={{ opacity: u.status === 'deleted' ? 0.4 : 1 }}>
+                            <td className="cell-status">
                               {isNoInternetUser ? (
                                 <span className="badge-no-internet" title="Internet access blocked by firewall rule">
                                   <IconBan size={12} style={{ marginRight: '0.35rem' }} />
@@ -1978,13 +2023,13 @@ export default function DashboardPage() {
                                 </span>
                               )}
                             </td>
-                            <td>
+                            <td className="cell-name">
                               <span className="user-name-cell">{u.name}</span>
                             </td>
-                            <td>
+                            <td className="cell-mac">
                               <span className="mac-address-pill">{u.mac_address}</span>
                             </td>
-                            <td>
+                            <td className="cell-groups">
                               <div className="group-tags-wrap">
                                 {u.groups && u.groups.length > 0 ? (
                                   u.groups.map((g) => (
@@ -2013,7 +2058,7 @@ export default function DashboardPage() {
                                 )}
                               </div>
                             </td>
-                            <td>
+                            <td className="cell-actions">
                               {u.status !== 'deleted' ? (
                                 <div className="table-actions-cell">
                                   {u.groups?.some((g) => g.is_protected) && currentUser.role === 'subadmin' ? (
@@ -2087,7 +2132,7 @@ export default function DashboardPage() {
               <div className="groups-create-card">
                 <form onSubmit={handleCreateGroup}>
                   <label className="form-label-title">Add New Group</label>
-                  <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.45rem', flexWrap: 'wrap' }}>
+                  <div className="groups-create-form-row" style={{ display: 'flex', gap: '0.75rem', marginTop: '0.45rem', flexWrap: 'wrap' }}>
                     <input
                       type="text"
                       className="form-input-element"
@@ -2154,8 +2199,8 @@ export default function DashboardPage() {
                       const isDefault = group.name.toLowerCase() === 'default';
                       const userCount = users.filter((u) => u.groups.some((g) => g.id === group.id)).length;
                       return (
-                        <tr key={group.id}>
-                          <td>
+                        <tr key={group.id} className="group-row-card">
+                          <td className="cell-group-name">
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                               <span style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.92rem' }}>
                                 {group.name}
@@ -2167,12 +2212,12 @@ export default function DashboardPage() {
                               )}
                             </div>
                           </td>
-                          <td>
+                          <td className="cell-group-count">
                             <span style={{ color: 'var(--text-secondary)' }}>
                               {userCount} {userCount === 1 ? 'client' : 'clients'}
                             </span>
                           </td>
-                          <td>
+                          <td className="cell-group-tags">
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
                               {group.is_protected && (
                                 <span className="badge-protected">
@@ -2195,7 +2240,7 @@ export default function DashboardPage() {
                               )}
                             </div>
                           </td>
-                          <td>
+                          <td className="cell-group-actions">
                             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', alignItems: 'center' }}>
                               {currentUser.role === 'admin' && !isDefault && (
                                 <>
@@ -2328,7 +2373,7 @@ export default function DashboardPage() {
                     </div>
 
                     <form className="subadmin-create-form" onSubmit={handleCreateSubadmin}>
-                      <div className="add-bar-field" style={{ flex: 1, minWidth: '180px' }}>
+                      <div className="add-bar-field subadmin-form-field" style={{ flex: 1, minWidth: '180px' }}>
                         <label className="add-bar-label">Username</label>
                         <input
                           type="text"
@@ -2340,7 +2385,7 @@ export default function DashboardPage() {
                         />
                       </div>
 
-                      <div className="add-bar-field" style={{ flex: 1, minWidth: '180px' }}>
+                      <div className="add-bar-field subadmin-form-field" style={{ flex: 1, minWidth: '180px' }}>
                         <label className="add-bar-label">Password</label>
                         <input
                           type="password"
@@ -2352,7 +2397,7 @@ export default function DashboardPage() {
                         />
                       </div>
 
-                      <div className="add-bar-field">
+                      <div className="add-bar-field subadmin-submit-field">
                         <button
                           type="submit"
                           className="btn btn-primary add-bar-submit-btn"
@@ -2388,19 +2433,19 @@ export default function DashboardPage() {
                       </thead>
                       <tbody>
                         {accountsList.map((acc) => (
-                          <tr key={acc.id}>
-                            <td>
+                          <tr key={acc.id} className="account-row-card">
+                            <td className="cell-account-username">
                               <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{acc.username}</span>
                             </td>
-                            <td>
+                            <td className="cell-account-role">
                               <span className={`badge-role badge-role-${acc.role}`}>{acc.role}</span>
                             </td>
-                            <td>
+                            <td className="cell-account-created">
                               <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
                                 {acc.created_at ? new Date(acc.created_at).toLocaleDateString() : 'System default'}
                               </span>
                             </td>
-                            <td style={{ textAlign: 'right' }}>
+                            <td className="cell-account-actions" style={{ textAlign: 'right' }}>
                               <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.85rem', justifyContent: 'flex-end' }}>
                                 <button
                                   type="button"
@@ -2533,7 +2578,7 @@ export default function DashboardPage() {
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                <div className="mac-auth-banner-right" style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                   <button
                     type="button"
                     className={`btn ${stats.mac_auth && !stats.mac_auth.enabled ? 'btn-primary' : 'btn-secondary'}`}
@@ -3657,7 +3702,7 @@ export default function DashboardPage() {
                 />
               </div>
 
-              <div className="modal-footer-row" style={{ marginTop: '1.5rem', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+              <div className="modal-actions-row modal-footer-row" style={{ marginTop: '1.5rem', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
                 <button
                   type="button"
                   className="btn btn-secondary"

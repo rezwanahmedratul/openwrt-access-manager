@@ -1326,22 +1326,32 @@ body {
 /* ============================================================
    RESPONSIVE DESIGN: MOBILE (≤ 768px)
    SIDEBAR REPOSITIONED TO SLEEK BOTTOM NAVIGATION BAR
+   MODERN TOUCH-OPTIMIZED CARD & COMPONENT ARCHITECTURE
    ============================================================ */
 @media (max-width: 768px) {
   /* Shell & Main Content */
   .app-shell {
-    flex-direction: column;
-    min-height: 100vh;
+    flex-direction: column !important;
+    min-height: 100vh !important;
+    overflow-x: hidden !important;
+    width: 100% !important;
   }
 
   .main-wrapper {
     margin-left: 0 !important;
     width: 100% !important;
-    padding-bottom: calc(76px + env(safe-area-inset-bottom, 16px)) !important;
+    max-width: 100vw !important;
+    padding-bottom: calc(120px + env(safe-area-inset-bottom, 20px)) !important;
+    overflow-x: hidden !important;
+    box-sizing: border-box !important;
   }
 
   .dashboard-container {
-    padding: 1.25rem 1rem 6rem 1rem !important;
+    padding: 1rem 0.85rem 4rem 0.85rem !important;
+    width: 100% !important;
+    max-width: 100vw !important;
+    box-sizing: border-box !important;
+    overflow-x: hidden !important;
   }
 
   /* Fixed Bottom Navigation Bar */
@@ -1352,8 +1362,8 @@ body {
     left: 0 !important;
     right: 0 !important;
     width: 100% !important;
-    height: calc(58px + env(safe-area-inset-bottom, 0px)) !important;
-    padding: 0.3rem 0.5rem calc(0.3rem + env(safe-area-inset-bottom, 0px)) 0.5rem !important;
+    height: calc(56px + env(safe-area-inset-bottom, 0px)) !important;
+    padding: 0.2rem 0.35rem calc(0.2rem + env(safe-area-inset-bottom, 0px)) 0.35rem !important;
     flex-direction: row !important;
     justify-content: space-around !important;
     align-items: center !important;
@@ -1361,10 +1371,10 @@ body {
     border-top: 1px solid var(--border-subtle) !important;
     background: var(--bg-card) !important;
     background-color: var(--bg-card) !important;
-    backdrop-filter: none !important;
-    -webkit-backdrop-filter: none !important;
+    backdrop-filter: blur(12px) !important;
+    -webkit-backdrop-filter: blur(12px) !important;
     z-index: 1000 !important;
-    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.08) !important;
+    box-shadow: 0 -2px 16px rgba(0, 0, 0, 0.07) !important;
     -webkit-transform: translate3d(0, 0, 0) !important;
     transform: translate3d(0, 0, 0) !important;
     -webkit-backface-visibility: hidden !important;
@@ -1406,25 +1416,31 @@ body {
     flex-direction: column !important;
     justify-content: center !important;
     align-items: center !important;
-    gap: 0.2rem !important;
-    padding: 0.35rem 0.15rem !important;
+    gap: 0.15rem !important;
+    padding: 0.3rem 0.1rem !important;
     width: 100% !important;
-    max-width: 76px !important;
+    max-width: 72px !important;
     height: 48px !important;
     border-radius: var(--radius-sm) !important;
     text-align: center !important;
+    transition: all 0.12s ease !important;
+  }
+
+  .nav-item-btn.active {
+    color: var(--text-primary) !important;
+    background: var(--bg-pill) !important;
   }
 
   .nav-label-text {
     display: block !important;
-    font-size: 0.64rem !important;
+    font-size: 0.65rem !important;
     font-weight: 600 !important;
     line-height: 1 !important;
     white-space: nowrap !important;
   }
 
   .nav-icon {
-    font-size: 1.1rem !important;
+    font-size: 1.15rem !important;
     width: auto !important;
     height: auto !important;
     opacity: 0.9 !important;
@@ -1433,9 +1449,11 @@ body {
 
   /* Minimal Top Bar on Mobile */
   .top-header {
-    padding: 0 1rem !important;
-    height: 54px !important;
+    padding: 0 0.85rem !important;
+    height: 52px !important;
     justify-content: space-between !important;
+    background: var(--bg-app) !important;
+    border-bottom: 1px solid var(--border-subtle) !important;
   }
 
   .mobile-header-brand {
@@ -1444,44 +1462,49 @@ body {
     gap: 0.5rem !important;
   }
 
+  .desktop-only-action {
+    display: none !important;
+  }
+
   .header-username-text {
     display: none !important;
   }
 
   .top-header-actions {
-    gap: 0.4rem !important;
+    gap: 0.5rem !important;
+    align-items: center !important;
   }
 
-  .top-header-actions .btn-sm {
-    padding: 0.3rem 0.5rem !important;
-    font-size: 0.72rem !important;
+  .user-dropdown-popover {
+    max-width: calc(100vw - 20px) !important;
+    width: 250px !important;
+    right: 0 !important;
+    top: calc(100% + 6px) !important;
   }
 
   /* Floating Staged Pending Bar */
   .floating-pending-bar-wrapper {
     left: 0 !important;
     right: 0 !important;
-    bottom: calc(58px + env(safe-area-inset-bottom, 0px) + 0.5rem) !important;
-    padding: 0 0.5rem !important;
+    bottom: calc(56px + env(safe-area-inset-bottom, 0px) + 0.45rem) !important;
+    padding: 0 0.65rem !important;
     z-index: 1010 !important;
     -webkit-transform: translate3d(0, 0, 0) !important;
     transform: translate3d(0, 0, 0) !important;
-    -webkit-backface-visibility: hidden !important;
-    backface-visibility: hidden !important;
-    will-change: transform !important;
     pointer-events: none !important;
   }
 
   .floating-pending-bar {
     width: 100% !important;
     max-width: 100% !important;
-    padding: 0.4rem 0.6rem !important;
+    padding: 0.42rem 0.65rem !important;
     border-radius: var(--radius-pill) !important;
     display: flex !important;
     justify-content: space-between !important;
     align-items: center !important;
     gap: 0.35rem !important;
     box-sizing: border-box !important;
+    box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.28) !important;
   }
 
   .pending-left-info {
@@ -1510,9 +1533,9 @@ body {
     font-size: 0.68rem !important;
     font-weight: 700 !important;
     line-height: 1 !important;
-    background: rgba(125, 125, 125, 0.22) !important;
+    background: rgba(125, 125, 125, 0.25) !important;
     color: inherit !important;
-    border: 1px solid rgba(125, 125, 125, 0.35) !important;
+    border: 1px solid rgba(125, 125, 125, 0.4) !important;
   }
 
   .pending-text-desktop {
@@ -1533,7 +1556,7 @@ body {
   }
 
   .pending-btn-actions .btn {
-    padding: 0.3rem 0.5rem !important;
+    padding: 0.25rem 0.55rem !important;
     font-size: 0.72rem !important;
     font-weight: 600 !important;
     height: 28px !important;
@@ -1551,95 +1574,142 @@ body {
     display: inline !important;
   }
 
-  @media (max-width: 380px) {
-    .floating-pending-bar {
-      padding: 0.35rem 0.45rem !important;
-      gap: 0.25rem !important;
-    }
-    .pending-left-info {
-      font-size: 0.7rem !important;
-      gap: 0.25rem !important;
-    }
-    .pending-text-mobile {
-      font-size: 0.68rem !important;
-    }
-    .pending-btn-actions {
-      gap: 0.2rem !important;
-    }
-    .pending-btn-actions .btn {
-      padding: 0.25rem 0.4rem !important;
-      font-size: 0.68rem !important;
-      height: 26px !important;
-      min-height: 26px !important;
-    }
-  }
-
   /* Page Typography & Actions */
   .header-row {
     flex-direction: column !important;
     align-items: flex-start !important;
     gap: 0.75rem !important;
-    margin-bottom: 1.25rem !important;
+    margin-bottom: 1rem !important;
   }
 
   .title-col {
     max-width: 100% !important;
+    width: 100% !important;
   }
 
   .page-headline {
-    font-size: 1.65rem !important;
-    line-height: 1.15 !important;
-    margin-bottom: 0.35rem !important;
+    font-size: 1.45rem !important;
+    line-height: 1.2 !important;
+    margin-bottom: 0.3rem !important;
+    letter-spacing: -0.03em !important;
   }
 
   .page-description {
-    font-size: 0.85rem !important;
-    line-height: 1.4 !important;
+    font-size: 0.82rem !important;
+    line-height: 1.45 !important;
+    color: var(--text-secondary) !important;
+  }
+
+  .gateway-pill {
+    font-size: 0.7rem !important;
+    padding: 0.2rem 0.6rem !important;
+    margin-bottom: 0.65rem !important;
   }
 
   .actions-col {
     width: 100% !important;
     display: flex !important;
-    flex-wrap: wrap !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
     gap: 0.5rem !important;
   }
 
   .actions-col .btn {
-    flex: 1 !important;
-    min-width: 120px !important;
+    width: 100% !important;
     justify-content: center !important;
+    height: 40px !important;
+    font-size: 0.85rem !important;
   }
 
-  /* Stats Cards Grid */
+  .header-mac-auth-badge {
+    width: 100% !important;
+    justify-content: center !important;
+    padding: 0.45rem 0.75rem !important;
+    box-sizing: border-box !important;
+  }
+
+  .header-mac-auth-btn {
+    width: 100% !important;
+    justify-content: center !important;
+    height: 38px !important;
+    font-size: 0.82rem !important;
+  }
+
+  /* Statistics Cards Grid */
   .stats-cards-row {
     grid-template-columns: repeat(2, 1fr) !important;
-    gap: 0.75rem !important;
-    margin-bottom: 1.25rem !important;
+    gap: 0.65rem !important;
+    margin-bottom: 1rem !important;
+    width: 100% !important;
   }
 
   .stat-card-box {
-    padding: 1rem 1.15rem !important;
+    padding: 0.8rem 0.85rem !important;
+    border-radius: var(--radius-md) !important;
+    box-sizing: border-box !important;
+  }
+
+  .stat-top-row {
+    margin-bottom: 0.5rem !important;
+  }
+
+  .stat-title-label {
+    font-size: 0.62rem !important;
+    letter-spacing: 0.03em !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    max-width: 85px !important;
+  }
+
+  .stat-index-badge {
+    font-size: 0.62rem !important;
+    padding: 0.1rem 0.35rem !important;
   }
 
   .stat-big-value {
-    font-size: 1.75rem !important;
+    font-size: 1.45rem !important;
+    font-weight: 800 !important;
+    line-height: 1.1 !important;
+    margin-bottom: 0.2rem !important;
   }
 
-  /* Horizontal Quick Add Bar */
+  .stat-footer-text {
+    font-size: 0.68rem !important;
+    line-height: 1.25 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+
+  /* Horizontal Quick Add Bar (Touch-Optimized Form) */
   .horizontal-add-card {
-    padding: 1rem !important;
-    margin-bottom: 1.25rem !important;
+    padding: 0.9rem !important;
+    margin-bottom: 1rem !important;
+    border-radius: var(--radius-md) !important;
+    box-sizing: border-box !important;
   }
 
   .horizontal-add-header {
     flex-wrap: wrap !important;
-    gap: 0.5rem !important;
+    gap: 0.4rem !important;
+    margin-bottom: 0.65rem !important;
+  }
+
+  .horizontal-add-title {
+    font-size: 0.78rem !important;
   }
 
   .horizontal-add-form {
     flex-direction: column !important;
-    gap: 0.75rem !important;
+    gap: 0.65rem !important;
     align-items: stretch !important;
+    width: 100% !important;
+  }
+
+  .add-bar-field {
+    width: 100% !important;
+    gap: 0.25rem !important;
   }
 
   .add-bar-field.field-mac {
@@ -1649,16 +1719,28 @@ body {
   .mac-segmented-box {
     width: 100% !important;
     justify-content: space-between !important;
-    padding: 0.2rem 0.3rem !important;
+    padding: 0.2rem 0.35rem !important;
     height: 42px !important;
+    box-sizing: border-box !important;
   }
 
   .mac-octet-input {
-    width: calc((100% - 35px) / 6) !important;
-    max-width: 44px !important;
-    min-width: 26px !important;
+    width: calc((100% - 32px) / 6) !important;
+    max-width: 46px !important;
+    min-width: 24px !important;
     height: 34px !important;
-    font-size: 0.88rem !important;
+    font-size: 16px !important;
+    font-weight: 700 !important;
+    text-align: center !important;
+    padding: 0 !important;
+    box-sizing: border-box !important;
+  }
+
+  .mac-octet-sep {
+    font-size: 0.9rem !important;
+    opacity: 0.45 !important;
+    line-height: 1 !important;
+    flex-shrink: 0 !important;
   }
 
   .add-bar-field.field-name {
@@ -1669,6 +1751,9 @@ body {
   .add-bar-name-input {
     width: 100% !important;
     height: 40px !important;
+    font-size: 16px !important;
+    padding: 0 0.75rem !important;
+    box-sizing: border-box !important;
   }
 
   .add-bar-field.field-group {
@@ -1678,49 +1763,79 @@ body {
   .add-bar-group-select {
     width: 100% !important;
     height: 40px !important;
+    font-size: 16px !important;
+    padding: 0 0.75rem !important;
+    box-sizing: border-box !important;
   }
 
   .add-bar-field.field-action {
     width: 100% !important;
-    padding-top: 0 !important;
+    padding-top: 0.25rem !important;
   }
 
   .add-bar-submit-btn {
     width: 100% !important;
     height: 42px !important;
     justify-content: center !important;
+    font-size: 0.88rem !important;
   }
 
   /* Search & Filter Toolbar */
   .search-filter-container {
     flex-direction: column !important;
     align-items: stretch !important;
-    gap: 0.65rem !important;
-    padding: 0.65rem !important;
-    margin-bottom: 1.25rem !important;
+    gap: 0.5rem !important;
+    padding: 0.6rem !important;
+    margin-bottom: 1rem !important;
+    border-radius: var(--radius-md) !important;
+    box-sizing: border-box !important;
   }
 
   .search-field-box {
     width: 100% !important;
   }
 
+  .search-text-input {
+    font-size: 16px !important;
+    height: 38px !important;
+    padding: 0.45rem 0.65rem 0.45rem 2.2rem !important;
+    box-sizing: border-box !important;
+  }
+
   .group-dropdown-select {
     width: 100% !important;
     height: 38px !important;
+    font-size: 16px !important;
+    padding: 0.45rem 0.75rem !important;
+    box-sizing: border-box !important;
   }
 
   /* Master MAC Auth Banner Card */
   .mac-auth-banner-card {
     flex-direction: column !important;
-    align-items: flex-start !important;
-    gap: 1rem !important;
-    padding: 1.25rem !important;
+    align-items: stretch !important;
+    gap: 0.85rem !important;
+    padding: 1rem !important;
+    border-radius: var(--radius-md) !important;
+    box-sizing: border-box !important;
   }
 
   .mac-auth-banner-left {
     flex-direction: column !important;
     align-items: flex-start !important;
-    gap: 0.75rem !important;
+    gap: 0.65rem !important;
+  }
+
+  .mac-auth-banner-icon {
+    width: 36px !important;
+    height: 36px !important;
+    font-size: 1rem !important;
+  }
+
+  .mac-auth-badge-status {
+    margin-left: 0 !important;
+    margin-top: 0.25rem !important;
+    font-size: 0.72rem !important;
   }
 
   .mac-auth-banner-right {
@@ -1730,100 +1845,617 @@ body {
   .mac-auth-banner-right .btn {
     width: 100% !important;
     justify-content: center !important;
+    height: 40px !important;
+    font-size: 0.85rem !important;
   }
 
-  /* Tables: Horizontal Scroll with Touch */
+  /* ============================================================
+     TABLE TO RESPONSIVE CARD ARCHITECTURE (MOBILE OPTIMIZED)
+     No more awkward horizontal cutoffs or unclickable actions!
+     ============================================================ */
   .table-card-container {
-    overflow-x: auto !important;
-    -webkit-overflow-scrolling: touch !important;
-    border-radius: var(--radius-md) !important;
-  }
-
-  .data-table {
-    min-width: 580px !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    overflow: visible !important;
+    border-radius: 0 !important;
+    contain: none !important;
     width: 100% !important;
   }
 
-  .data-table th,
-  .data-table td {
-    padding: 0.85rem 1rem !important;
-    font-size: 0.82rem !important;
+  .data-table {
+    display: block !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    border-spacing: 0 !important;
+    border-collapse: separate !important;
   }
 
-  /* Modals */
-  .modal-overlay {
+  .data-table thead {
+    display: none !important;
+  }
+
+  .data-table tbody {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 0.65rem !important;
+    width: 100% !important;
+  }
+
+  /* User Devices Card */
+  .user-row-card {
+    display: grid !important;
+    grid-template-columns: 1fr auto !important;
+    grid-template-areas:
+      "name status"
+      "mac mac"
+      "groups groups"
+      "actions actions" !important;
+    background: var(--bg-card) !important;
+    border: 1px solid var(--border-card) !important;
+    border-radius: var(--radius-md) !important;
+    padding: 0.85rem 1rem !important;
+    gap: 0.45rem 0.65rem !important;
+    align-items: center !important;
+    box-shadow: var(--shadow-subtle) !important;
+    contain: none !important;
+    content-visibility: visible !important;
+    box-sizing: border-box !important;
+    width: 100% !important;
+  }
+
+  .cell-name {
+    grid-area: name !important;
+    padding: 0 !important;
+    border: none !important;
+  }
+
+  .cell-name .user-name-cell {
+    font-size: 0.98rem !important;
+    font-weight: 700 !important;
+    color: var(--text-primary) !important;
+    line-height: 1.25 !important;
+  }
+
+  .cell-status {
+    grid-area: status !important;
+    padding: 0 !important;
+    border: none !important;
+    justify-self: end !important;
+  }
+
+  .cell-status .status-badge-capsule,
+  .cell-status .badge-no-internet {
+    font-size: 0.68rem !important;
+    padding: 0.18rem 0.55rem !important;
+  }
+
+  .cell-mac {
+    grid-area: mac !important;
+    padding: 0 !important;
+    border: none !important;
+  }
+
+  .cell-mac .mac-address-pill {
+    font-size: 0.76rem !important;
+    padding: 0.22rem 0.6rem !important;
+    letter-spacing: 0.04em !important;
+    display: inline-block !important;
+  }
+
+  .cell-groups {
+    grid-area: groups !important;
+    padding: 0 !important;
+    border: none !important;
+  }
+
+  .cell-groups .group-tags-wrap {
+    gap: 0.35rem !important;
+  }
+
+  .cell-groups .group-tag-pill {
+    font-size: 0.7rem !important;
+    padding: 0.15rem 0.55rem !important;
+  }
+
+  .cell-actions {
+    grid-area: actions !important;
+    padding: 0.5rem 0 0 0 !important;
+    border: none !important;
+    border-top: 1px solid var(--border-subtle) !important;
+    margin-top: 0.2rem !important;
+    width: 100% !important;
+  }
+
+  .cell-actions .table-actions-cell {
+    justify-content: flex-end !important;
+    gap: 0.5rem !important;
+    width: 100% !important;
+  }
+
+  .cell-actions .btn-text-action {
+    background: var(--bg-pill) !important;
+    border: 1px solid var(--border-subtle) !important;
+    border-radius: var(--radius-sm) !important;
+    padding: 0.35rem 0.85rem !important;
+    font-size: 0.78rem !important;
+    font-weight: 600 !important;
+    min-height: 32px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    color: var(--text-primary) !important;
+  }
+
+  .cell-actions .btn-text-action:hover {
+    background: var(--bg-hover) !important;
+    border-color: var(--border-strong) !important;
+  }
+
+  /* Groups Page Card */
+  .group-row-card {
+    display: grid !important;
+    grid-template-columns: 1fr auto !important;
+    grid-template-areas:
+      "name count"
+      "tags tags"
+      "actions actions" !important;
+    background: var(--bg-card) !important;
+    border: 1px solid var(--border-card) !important;
+    border-radius: var(--radius-md) !important;
+    padding: 0.85rem 1rem !important;
+    gap: 0.45rem 0.65rem !important;
+    align-items: center !important;
+    box-shadow: var(--shadow-subtle) !important;
+    box-sizing: border-box !important;
+    width: 100% !important;
+  }
+
+  .cell-group-name {
+    grid-area: name !important;
+    padding: 0 !important;
+    border: none !important;
+  }
+
+  .cell-group-count {
+    grid-area: count !important;
+    padding: 0 !important;
+    border: none !important;
+    justify-self: end !important;
+    font-size: 0.78rem !important;
+  }
+
+  .cell-group-tags {
+    grid-area: tags !important;
+    padding: 0 !important;
+    border: none !important;
+  }
+
+  .cell-group-actions {
+    grid-area: actions !important;
+    padding: 0.5rem 0 0 0 !important;
+    border: none !important;
+    border-top: 1px solid var(--border-subtle) !important;
+    margin-top: 0.2rem !important;
+    width: 100% !important;
+  }
+
+  .cell-group-actions .btn-text-action {
+    background: var(--bg-pill) !important;
+    border: 1px solid var(--border-subtle) !important;
+    border-radius: var(--radius-sm) !important;
+    padding: 0.35rem 0.75rem !important;
+    font-size: 0.78rem !important;
+    font-weight: 600 !important;
+    min-height: 32px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    color: var(--text-primary) !important;
+  }
+
+  .groups-create-card {
+    padding: 0.9rem !important;
+    margin-bottom: 1rem !important;
+    border-radius: var(--radius-md) !important;
+    box-sizing: border-box !important;
+  }
+
+  .groups-create-form-row {
+    flex-direction: column !important;
+    gap: 0.5rem !important;
+    align-items: stretch !important;
+  }
+
+  .groups-create-form-row input {
+    max-width: 100% !important;
+    width: 100% !important;
+    height: 40px !important;
+    font-size: 16px !important;
+    box-sizing: border-box !important;
+  }
+
+  .groups-create-form-row button {
+    width: 100% !important;
+    height: 40px !important;
+    justify-content: center !important;
+  }
+
+  /* Accounts Page Card */
+  .account-row-card {
+    display: grid !important;
+    grid-template-columns: 1fr auto !important;
+    grid-template-areas:
+      "name role"
+      "created created"
+      "actions actions" !important;
+    background: var(--bg-card) !important;
+    border: 1px solid var(--border-card) !important;
+    border-radius: var(--radius-md) !important;
+    padding: 0.85rem 1rem !important;
+    gap: 0.45rem 0.65rem !important;
+    align-items: center !important;
+    box-shadow: var(--shadow-subtle) !important;
+    box-sizing: border-box !important;
+    width: 100% !important;
+  }
+
+  .cell-account-username {
+    grid-area: name !important;
+    padding: 0 !important;
+    border: none !important;
+    font-size: 0.95rem !important;
+    font-weight: 700 !important;
+  }
+
+  .cell-account-role {
+    grid-area: role !important;
+    padding: 0 !important;
+    border: none !important;
+    justify-self: end !important;
+  }
+
+  .cell-account-created {
+    grid-area: created !important;
+    padding: 0 !important;
+    border: none !important;
+    font-size: 0.76rem !important;
+  }
+
+  .cell-account-actions {
+    grid-area: actions !important;
+    padding: 0.5rem 0 0 0 !important;
+    border: none !important;
+    border-top: 1px solid var(--border-subtle) !important;
+    margin-top: 0.2rem !important;
+    width: 100% !important;
+  }
+
+  .cell-account-actions .btn-text-action {
+    background: var(--bg-pill) !important;
+    border: 1px solid var(--border-subtle) !important;
+    border-radius: var(--radius-sm) !important;
+    padding: 0.35rem 0.75rem !important;
+    font-size: 0.78rem !important;
+    font-weight: 600 !important;
+    min-height: 32px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+  }
+
+  .account-info-box {
+    padding: 1rem !important;
+    margin-bottom: 1rem !important;
+    border-radius: var(--radius-md) !important;
+    box-sizing: border-box !important;
+  }
+
+  .account-details-grid {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 0.75rem !important;
+  }
+
+  .subadmin-create-form {
+    flex-direction: column !important;
+    gap: 0.65rem !important;
+    align-items: stretch !important;
+    width: 100% !important;
+  }
+
+  .subadmin-form-field {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .subadmin-form-field input {
+    width: 100% !important;
+    height: 40px !important;
+    font-size: 16px !important;
+    box-sizing: border-box !important;
+  }
+
+  .subadmin-submit-field {
+    width: 100% !important;
+  }
+
+  .subadmin-submit-field button {
+    width: 100% !important;
+    height: 42px !important;
+    justify-content: center !important;
+  }
+
+  /* Modals Touch Optimization */
+  .modal-backdrop,
+  .conflict-modal-overlay {
     padding: 0.75rem !important;
     align-items: center !important;
+    z-index: 1200 !important;
+    box-sizing: border-box !important;
   }
 
   .modal-card,
   .conflict-modal-card,
   .mac-auth-modal-card {
     width: 100% !important;
-    max-height: 85vh !important;
+    max-width: 100% !important;
+    max-height: 88vh !important;
     overflow-y: auto !important;
-    padding: 1.25rem !important;
+    padding: 1.25rem 1rem !important;
     margin: auto !important;
+    border-radius: var(--radius-md) !important;
+    box-sizing: border-box !important;
+  }
+
+  .modal-headline {
+    font-size: 1.15rem !important;
+  }
+
+  .modal-close-icon {
+    width: 36px !important;
+    height: 36px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-size: 1.25rem !important;
+  }
+
+  .form-input-element {
+    font-size: 16px !important;
+    padding: 0.65rem 0.75rem !important;
+    box-sizing: border-box !important;
+  }
+
+  .modal-actions-row,
+  .modal-footer-row,
+  .conflict-actions-footer {
+    flex-direction: column-reverse !important;
+    gap: 0.5rem !important;
+    width: 100% !important;
+  }
+
+  .modal-actions-row .btn,
+  .modal-footer-row .btn,
+  .conflict-actions-footer button {
+    width: 100% !important;
+    justify-content: center !important;
+    height: 42px !important;
+    font-size: 0.88rem !important;
   }
 
   .mac-auth-duration-grid {
     grid-template-columns: repeat(2, 1fr) !important;
-  }
-
-  .modal-actions-row {
-    flex-direction: column-reverse !important;
     gap: 0.5rem !important;
   }
 
-  .modal-actions-row .btn {
-    width: 100% !important;
-    justify-content: center !important;
+  .mac-auth-duration-btn {
+    padding: 0.5rem 0.35rem !important;
+    font-size: 0.75rem !important;
+    min-height: 52px !important;
+  }
+
+  .mac-auth-duration-btn .duration-caption {
+    font-size: 0.64rem !important;
   }
 
   /* Settings Page Specifics */
-  .endpoints-table-container {
-    overflow-x: auto !important;
-    -webkit-overflow-scrolling: touch !important;
+  .settings-page-wrapper {
+    gap: 1rem !important;
   }
 
-  .endpoints-table-container table {
-    min-width: 500px !important;
+  .settings-section-card {
+    padding: 1rem !important;
+    border-radius: var(--radius-md) !important;
+    box-sizing: border-box !important;
   }
 
-  .config-code-block {
-    font-size: 0.72rem !important;
+  .settings-section-header {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 0.65rem !important;
+    margin-bottom: 0.85rem !important;
+    padding-bottom: 0.75rem !important;
+  }
+
+  .settings-section-title {
+    font-size: 0.98rem !important;
+  }
+
+  .settings-section-header .btn {
+    width: 100% !important;
+    justify-content: center !important;
+    height: 38px !important;
+  }
+
+  .settings-row-item {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 0.5rem !important;
+    padding: 0.85rem 0 !important;
+  }
+
+  .settings-row-info {
+    max-width: 100% !important;
+  }
+
+  .settings-row-control {
+    width: 100% !important;
+    justify-content: flex-start !important;
+  }
+
+  .settings-row-control input,
+  .settings-row-control select {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: 38px !important;
+    font-size: 16px !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Switch Toggle rows stay horizontal like native mobile settings */
+  .settings-row-item:has(.switch-toggle-label) {
+    flex-direction: row !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+  }
+
+  .settings-row-item:has(.switch-toggle-label) .settings-row-info {
+    max-width: 75% !important;
+  }
+
+  .settings-row-item:has(.switch-toggle-label) .settings-row-control {
+    width: auto !important;
+  }
+
+  .theme-picker-cards {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 0.65rem !important;
+  }
+
+  .theme-card-btn {
     padding: 0.75rem !important;
-    overflow-x: auto !important;
+    box-sizing: border-box !important;
   }
 
-  .endpoint-item-row {
+  .endpoints-table-container {
+    overflow-x: hidden !important;
+    border-radius: var(--radius-md) !important;
+  }
+
+  .endpoint-list-row {
     flex-direction: column !important;
     align-items: flex-start !important;
     gap: 0.5rem !important;
+    padding: 0.75rem !important;
+    box-sizing: border-box !important;
   }
 
-  .endpoint-copy-actions {
+  .endpoint-badge-col {
     width: 100% !important;
-    justify-content: flex-end !important;
+  }
+
+  .endpoint-desc-text {
+    font-size: 0.72rem !important;
+  }
+
+  /* Authentication / Login Screen */
+  .auth-page-container {
+    padding: 1rem !important;
+  }
+
+  .auth-card-box {
+    padding: 1.5rem 1.15rem !important;
+    border-radius: var(--radius-md) !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .auth-brand-center {
+    margin-bottom: 1.35rem !important;
+  }
+
+  .auth-brand-logo {
+    width: 42px !important;
+    height: 42px !important;
+    font-size: 1.3rem !important;
+    margin-bottom: 0.75rem !important;
+  }
+
+  .auth-card-title {
+    font-size: 1.25rem !important;
+  }
+
+  .auth-card-subtitle {
+    font-size: 0.8rem !important;
+  }
+
+  .auth-form .form-input-element {
+    font-size: 16px !important;
+    height: 42px !important;
+  }
+
+  .auth-form button[type="submit"] {
+    height: 44px !important;
+    font-size: 0.9rem !important;
   }
 }
 
 /* Extra Small Phones (≤ 420px) */
 @media (max-width: 420px) {
+  .page-headline {
+    font-size: 1.35rem !important;
+  }
+
+  .stats-cards-row {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 0.5rem !important;
+  }
+
+  .stat-card-box {
+    padding: 0.7rem 0.65rem !important;
+  }
+
+  .stat-title-label {
+    font-size: 0.58rem !important;
+    max-width: 70px !important;
+  }
+
+  .stat-big-value {
+    font-size: 1.35rem !important;
+  }
+
+  .stat-footer-text {
+    font-size: 0.65rem !important;
+  }
+
+  .account-details-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .theme-picker-cards {
+    grid-template-columns: 1fr !important;
+  }
+
+  .nav-item-btn {
+    max-width: 64px !important;
+  }
+
+  .nav-label-text {
+    font-size: 0.6rem !important;
+  }
+}
+
+/* Tiny Phones (≤ 360px) */
+@media (max-width: 360px) {
+  .dashboard-container {
+    padding: 0.75rem 0.65rem 4rem 0.65rem !important;
+  }
+
   .stats-cards-row {
     grid-template-columns: 1fr !important;
   }
 
-  .top-header-actions a[download] {
-    display: none !important;
-  }
-
-  .page-headline {
-    font-size: 1.45rem !important;
-  }
-
   .mac-octet-input {
-    font-size: 0.78rem !important;
+    width: calc((100% - 25px) / 6) !important;
+    font-size: 15px !important;
   }
 }
 
