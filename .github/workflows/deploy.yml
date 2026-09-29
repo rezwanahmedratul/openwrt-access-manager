@@ -1,0 +1,150 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # ============================================================================
+  # Stage 1: Build Docker image in GitHub Cloud and push to GHCR
+  # ============================================================================
+  build-and-push:
+    name: Build & Push Docker Image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry (ghcr.io)
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Lowercase image name for GHCR compliance
+        id: image-name
+        run: |
+          echo "IMAGE_NAME_LOWER=${IMAGE_NAME,,}" >> $GITHUB_ENV
+
+      - name: Extract Docker metadata (tags, labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,format=short
+            type=ref,event=branch
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            NEXT_PUBLIC_SUPABASE_URL=${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+            NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
+
+  # ============================================================================
+  # Stage 2: Trigger Self-Hosted Home Action Server -> Deploy to Production
+  # ============================================================================
+  deploy:
+    name: Deploy to Production via Home Action Server
+    needs: build-and-push
+    runs-on: self-hosted
+    env:
+      PROD_HOST: ${{ secrets.PROD_HOST || '127.0.0.1' }}
+      PROD_USER: ${{ secrets.PROD_USER || 'root' }}
+      PROD_PORT: ${{ secrets.PROD_PORT || '22' }}
+      PROD_DIR: ${{ secrets.PROD_DIR || '/opt/openwrt-access-manager' }}
+
+    steps:
+      - name: Checkout repository on action runner
+        uses: actions/checkout@v4
+
+      - name: Lowercase image name for GHCR pull
+        run: |
+          echo "IMAGE_NAME_LOWER=${IMAGE_NAME,,}" >> $GITHUB_ENV
+
+      - name: Trigger Production Server to Pull & Update
+        env:
+          PROD_SSH_KEY: ${{ secrets.PROD_SSH_KEY }}
+          GHCR_PULL_TOKEN: ${{ secrets.GHCR_PULL_TOKEN || secrets.GITHUB_TOKEN }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          echo "======================================================================="
+          echo "==> Deploy triggered on Home Action Server: $(hostname) [$(date)]"
+          echo "==> Target Production Server: ${PROD_USER}@${PROD_HOST}:${PROD_PORT}"
+          echo "==> Target Directory: ${PROD_DIR}"
+          echo "======================================================================="
+
+          # Set up SSH key if provided via GitHub Secrets
+          SSH_KEY_ARG=""
+          if [ -n "$PROD_SSH_KEY" ]; then
+            mkdir -p ~/.ssh
+            chmod 700 ~/.ssh
+            echo "$PROD_SSH_KEY" > ~/.ssh/prod_deploy_key
+            chmod 600 ~/.ssh/prod_deploy_key
+            SSH_KEY_ARG="-i ~/.ssh/prod_deploy_key"
+          fi
+
+          # Function to execute command on production server
+          remote_exec() {
+            ssh $SSH_KEY_ARG \
+                -o StrictHostKeyChecking=no \
+                -o ConnectTimeout=15 \
+                -p "$PROD_PORT" \
+                "${PROD_USER}@${PROD_HOST}" "$1"
+          }
+
+          echo "==> 1. Testing SSH connectivity to production server..."
+          remote_exec "echo '[OK] Connected successfully to \$(hostname) from GitHub Action server \$(hostname)'"
+
+          echo "==> 2. Ensuring remote production deployment directory exists..."
+          remote_exec "mkdir -p '$PROD_DIR'"
+
+          echo "==> 3. Syncing production compose file and deployment script..."
+          scp $SSH_KEY_ARG \
+              -o StrictHostKeyChecking=no \
+              -P "$PROD_PORT" \
+              docker-compose.prod.yml "${PROD_USER}@${PROD_HOST}:${PROD_DIR}/docker-compose.prod.yml"
+
+          scp $SSH_KEY_ARG \
+              -o StrictHostKeyChecking=no \
+              -P "$PROD_PORT" \
+              scripts/deploy-prod.sh "${PROD_USER}@${PROD_HOST}:${PROD_DIR}/deploy-prod.sh"
+
+          echo "==> 4. Triggering image pull and deployment on production server..."
+          remote_exec "
+            cd '$PROD_DIR'
+            chmod +x deploy-prod.sh
+            export IMAGE_REPO='${IMAGE_NAME_LOWER}'
+            export IMAGE_TAG='latest'
+            export GHCR_USER='${ACTOR}'
+            export GHCR_TOKEN='${GHCR_PULL_TOKEN}'
+            ./deploy-prod.sh
+          "
+
+          echo "======================================================================="
+          echo "==> [SUCCESS] Production Server successfully deployed image ${IMAGE_NAME_LOWER}:latest"
+          echo "======================================================================="

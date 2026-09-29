@@ -1,0 +1,41 @@
+services:
+  # OpenWrt MAC Access Manager Web Application (Production Pre-built Image)
+  app:
+    image: ghcr.io/${IMAGE_REPO:-rezwanahmedratul/openwrt-access-manager}:${IMAGE_TAG:-latest}
+    container_name: openwrt-access-manager
+    restart: unless-stopped
+    network_mode: host
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - HOSTNAME=0.0.0.0
+      - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL:-}
+      - NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=${NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:-}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY:-}
+      - ROUTER_SECRET=${ROUTER_SECRET:-}
+      - REDIS_URL=${REDIS_URL:-redis://127.0.0.1:6379}
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  # High-Performance In-Memory Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: openwrt-access-manager-redis
+    restart: unless-stopped
+    command: redis-server --save 60 1 --loglevel warning
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+volumes:
+  redis_data:
+    driver: local
