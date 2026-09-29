@@ -258,6 +258,19 @@ export default function DashboardPage() {
     setTimeout(() => setNotification(null), 4000);
   };
 
+  const formatDateTime = (dateStr?: string | null) => {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return '';
+    return d.toLocaleString([], {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
   const handleCopyText = (text: string, type: 'token' | 'endpoint') => {
     navigator.clipboard.writeText(text);
     if (type === 'token') {
@@ -1608,7 +1621,7 @@ export default function DashboardPage() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.25)', padding: '0.4rem 0.85rem', borderRadius: 'var(--radius-md)' }}>
                       <span className="status-indicator-dot" style={{ background: '#ef4444' }}></span>
                       <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#ef4444' }}>
-                        MAC Auth: OFF (Open{stats.mac_auth.disabled_until ? ` until ${new Date(stats.mac_auth.disabled_until).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : ' permanently'})
+                        MAC Auth: OFF (Open{stats.mac_auth.disabled_until ? ` until ${formatDateTime(stats.mac_auth.disabled_until)}` : ' permanently'})
                       </span>
                     </div>
                   ) : (
@@ -2457,7 +2470,7 @@ export default function DashboardPage() {
                       <div className="mac-auth-timer-chip">
                         <IconClock size={13} />
                         <span>
-                          Re-enables automatically on {new Date(stats.mac_auth.disabled_until).toLocaleString()}
+                          Re-enables automatically on {formatDateTime(stats.mac_auth.disabled_until)}
                         </span>
                       </div>
                     )}

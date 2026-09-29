@@ -170,7 +170,7 @@ export async function POST(request: Request) {
       hash: configHash,
       message: newMacAuth.enabled
         ? 'MAC Authentication turned ON (Access restricted to registered MACs)'
-        : `MAC Authentication turned OFF (Open to all devices${newMacAuth.disabled_until ? ` until ${new Date(newMacAuth.disabled_until).toLocaleString()}` : ' permanently'})`,
+        : `MAC Authentication turned OFF (Open to all devices${newMacAuth.disabled_until ? ` until ${new Date(newMacAuth.disabled_until).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}` : ' permanently'})`,
     });
   } catch (err: any) {
     return NextResponse.json({ error: err.message || 'Server error' }, { status: 500 });
