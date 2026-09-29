@@ -7,6 +7,9 @@ import { cacheGet, cacheSet, cacheDelPrefix } from '@/lib/cache';
 
 const GROUPS_CACHE_KEY = 'cache:groups:list';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 async function invalidateGroupsAndUsersCache() {
   await Promise.all([
     cacheDelPrefix('cache:groups:'),

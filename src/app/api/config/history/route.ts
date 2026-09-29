@@ -3,6 +3,9 @@ import { getServiceSupabase } from '@/lib/supabase';
 import { getMockState } from '@/lib/mock-store';
 import { generateFirewallConfig, generateEthersConfig, computeConfigHash, UserConfigInput } from '@/lib/config-generator';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export async function GET() {
   const supabase = getServiceSupabase();
   const isSupabaseConfigured = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_URL.startsWith('http'));

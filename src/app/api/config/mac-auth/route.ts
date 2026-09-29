@@ -5,6 +5,9 @@ import { getServiceSupabase } from '@/lib/supabase';
 import { generateFirewallConfig, generateEthersConfig, computeConfigHash, UserConfigInput } from '@/lib/config-generator';
 import { MacAuthSettings } from '@/lib/types';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export async function GET(request: Request) {
   const session = getSessionFromRequest(request);
   if (!session) {

@@ -5,6 +5,9 @@ import { cacheGet, cacheSet } from '@/lib/cache';
 
 const ETHERS_CACHE_KEY = 'cache:config:ethers';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 function authenticateRouter(request: Request): boolean {
   const authHeader = request.headers.get('authorization') || '';
   const routerSecret = process.env.ROUTER_SECRET || 'openwrt-secret-token-change-in-production';

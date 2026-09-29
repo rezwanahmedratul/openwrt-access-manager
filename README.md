@@ -34,7 +34,8 @@
   - [2. Configure Environment](#2-configure-environment)
   - [3. Run Locally](#3-run-locally)
 - [Deployment](#deployment)
-  - [Docker (Recommended)](#docker-recommended)
+  - [Vercel (Cloud / Serverless)](#vercel-cloud--serverless)
+  - [Docker (Standalone / Self-Hosted)](#docker-standalone--self-hosted)
   - [Manual Deployment](#manual-deployment)
 - [OpenWrt Router Setup](#openwrt-router-setup)
   - [Install Sync Script](#install-sync-script)
@@ -130,14 +131,15 @@ This application provides a web UI that:
 | **Draft System** | Stage changes before applying — review, undo, then publish |
 | **Version History** | Full audit trail of every published configuration |
 | **Config Preview** | Download and preview generated firewall/ethers files |
-| **Role-Based Access** | Admin and Subadmin roles with different permission levels |
+| **Role-Based Access** | Admin and Subadmin roles with granular permission levels |
 | **Account Management** | Admins can create/delete subadmin accounts |
+| **Password Management** | Admins can change passwords for both admin and subadmin accounts |
 | **Auto-Sync to Router** | Cron-based script on the router pulls changes automatically |
 | **Dark / Light Theme** | System-aware theme with manual toggle |
 | **Responsive Design** | Works on desktop, tablet, and mobile (bottom nav on mobile) |
-| **Redis Caching** | Optional Redis cache with in-memory fallback for fast API responses |
+| **Redis & Memory Caching** | Optional Redis cache with automated zero-config in-memory fallback |
 | **MAC Normalization** | Accepts MAC addresses in any format (colon, dash, dot, raw) |
-| **Docker Support** | Multi-stage Dockerfile + docker-compose for one-command deployment |
+| **Dual Deployment Ready** | 100% dual-compatible: deploy on Vercel Serverless or standalone Docker |
 
 ---
 
@@ -278,9 +280,41 @@ Open [http://localhost:3000](http://localhost:3000) and log in with the default 
 
 ## Deployment
 
-### Docker (Recommended)
+The application is built with **100% dual-compatibility**: you can deploy it as a serverless web app on **Vercel** or self-host it on a Linux server using **Docker**.
 
-The project includes a multi-stage Dockerfile and docker-compose configuration for production deployment.
+### Vercel (Cloud / Serverless)
+
+Deploying to Vercel provides a globally distributed, zero-maintenance HTTPS endpoint for both your web dashboard and OpenWrt router polling.
+
+#### 1. Import to Vercel
+
+1. Push your repository to GitHub.
+2. Go to [vercel.com/new](https://vercel.com/new) and import the repository.
+3. Framework preset will automatically be recognized as **Next.js**.
+
+#### 2. Configure Environment Variables in Vercel
+
+In the Vercel project configuration screen under **Environment Variables**, add:
+
+| Variable | Required | Description |
+|---|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | Yes | Your Supabase project URL (`https://<project-ref>.supabase.co`) |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Yes | Your Supabase publishable/anon key |
+| `SUPABASE_SERVICE_ROLE_KEY` | Yes | Supabase service role key (for backend API operations) |
+| `ROUTER_SECRET` | Yes | Shared secret string for OpenWrt router synchronization |
+| `REDIS_URL` | Optional | Remote Redis URL (e.g. Upstash Redis). If omitted, the app uses built-in in-memory caching |
+
+> **💡 Serverless Caching Note:** If `REDIS_URL` is omitted on Vercel, the app automatically runs its high-speed in-memory cache without errors or connection delays. For distributed caching across multiple edge instances, connect a free [Upstash Redis](https://upstash.com) integration on Vercel.
+
+#### 3. Deploy
+
+Click **Deploy**. Once built, Vercel will provide your live production URL (e.g., `https://mac.yourdomain.com` or `https://openwrt-access-manager.vercel.app`).
+
+---
+
+### Docker (Standalone / Self-Hosted)
+
+The project includes a multi-stage Dockerfile and docker-compose configuration for standalone VPS or local server deployment.
 
 #### Quick Deploy
 
@@ -350,26 +384,31 @@ node .next/standalone/server.js
 
 The router uses a lightweight ash script ([`scripts/sync-config.sh`](scripts/sync-config.sh)) that periodically checks for configuration updates and applies them.
 
-### Install Sync Script
+### Quick Install (Run directly on Router)
 
-1. **Copy the script to your router:**
-
-```bash
-scp scripts/sync-config.sh root@192.168.1.1:/root/sync-config.sh
-```
-
-2. **SSH into the router and edit the configuration:**
+SSH into your OpenWrt router (`ssh root@192.168.1.1`) and execute:
 
 ```bash
-ssh root@192.168.1.1
-vi /root/sync-config.sh
+# 1. Download the script to your router
+wget --no-check-certificate -O /root/sync-config.sh https://raw.githubusercontent.com/rezwanahmedratul/openwrt-access-manager/main/scripts/sync-config.sh
+
+# 2. Make it executable
+chmod +x /root/sync-config.sh
+
+# 3. Test run it manually once
+/root/sync-config.sh
+
+# 4. Add to crontab to run every 2 minutes
+(crontab -l 2>/dev/null; echo "*/2 * * * * /root/sync-config.sh >> /tmp/sync-config.log 2>&1") | crontab -
 ```
 
-3. **Update these variables at the top of the script:**
+### Script Configuration
+
+Edit `/root/sync-config.sh` on the router (`vi /root/sync-config.sh`) to ensure `SERVER_URL` and `AUTH_TOKEN` point to your deployment:
 
 ```bash
 # Base URL of the Access Manager web panel (no trailing slash)
-SERVER_URL="http://192.168.1.100:3000"
+SERVER_URL="https://mac.ratul.fun"  # or your Vercel URL / server IP:port
 
 # Bearer token — must match ROUTER_SECRET on the server
 AUTH_TOKEN="your-secure-secret-here"
@@ -379,18 +418,9 @@ FIREWALL_FILE="/etc/config/firewall"
 ETHERS_FILE="/etc/ethers"
 ```
 
-4. **Make it executable:**
+After editing, restart cron to ensure scheduled executions run smoothly:
 
 ```bash
-chmod +x /root/sync-config.sh
-```
-
-### Configure Cron Job
-
-Add a cron entry to run the sync every 5 minutes:
-
-```bash
-echo "*/5 * * * * /root/sync-config.sh >> /tmp/sync-config.log 2>&1" >> /etc/crontabs/root
 /etc/init.d/cron restart
 ```
 
@@ -517,6 +547,7 @@ All API routes are under `/api/`. Router-facing endpoints use Bearer token authe
 |---|---|---|---|
 | `GET` | `/api/accounts` | Admin | List all accounts |
 | `POST` | `/api/accounts` | Admin | Create a subadmin account |
+| `PATCH` | `/api/accounts` | Admin | Change password for admin or subadmin accounts |
 | `DELETE` | `/api/accounts?id=<uuid>` | Admin | Delete a subadmin account |
 | `GET` | `/api/system/status` | Session | Cache engine status + diagnostics |
 | `POST` | `/api/system/status` | Admin | Flush all caches |
@@ -538,6 +569,7 @@ The application supports two roles with different permission levels:
 | Disable MAC auth permanently | ✅ | ❌ |
 | Disable MAC auth temporarily | ✅ | ✅ (max 30 days) |
 | Manage subadmin accounts | ✅ | ❌ |
+| Change account passwords | ✅ (Admin & Subadmins) | ❌ |
 | View accounts list | ✅ | ❌ |
 | Flush system cache | ✅ | ❌ |
 
@@ -594,12 +626,14 @@ The application includes a two-tier caching system (`src/lib/cache.ts`):
 
 ## Default Credentials
 
-| Username | Password | Role |
-|---|---|---|
-| `admin` | `admin123` | Admin |
-| `subadmin` | `subadmin123` | Subadmin |
+When first initialized via database seed:
 
-> ⚠️ **Change these immediately in production!** Update the passwords via the Settings page or directly in the Supabase `accounts` table.
+| Username | Initial Password | Role | Password Modification |
+|---|---|---|---|
+| `admin` | `admin123` | Admin | Admin only (via UI or API) |
+| `subadmin` | `subadmin123` | Subadmin | Admin only (via UI or API) |
+
+> 🔒 **Security Notice:** The login screen does not expose or auto-fill credentials. Administrators can change the password for both the primary `admin` account and any `subadmin` accounts at any time through the **Change Password** option in the user profile menu or the **Accounts** tab.
 
 ---
 

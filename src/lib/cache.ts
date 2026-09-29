@@ -28,7 +28,12 @@ function getRedisClient(): Redis | null {
     return redisClient;
   }
 
-  const redisUrl = process.env.REDIS_URL || 'redis://127.0.0.1:6379';
+  const redisUrl = process.env.REDIS_URL;
+  // If REDIS_URL is not set (e.g. Vercel without external Redis), gracefully use fast in-memory cache
+  if (!redisUrl) {
+    isRedisAvailable = false;
+    return null;
+  }
 
   try {
     const client = new Redis(redisUrl, {
@@ -36,8 +41,9 @@ function getRedisClient(): Redis | null {
       connectTimeout: 1000,
       commandTimeout: 500,
       enableOfflineQueue: false,
+      lazyConnect: true,
       retryStrategy(times) {
-        if (times > 3) {
+        if (times > 2) {
           isRedisAvailable = false;
           return null;
         }

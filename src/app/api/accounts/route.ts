@@ -7,6 +7,9 @@ import { cacheGet, cacheSet, cacheDelPrefix } from '@/lib/cache';
 
 const ACCOUNTS_CACHE_KEY = 'cache:accounts:list';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export async function GET(request: Request) {
   const session = getSessionFromRequest(request);
   if (!session || session.role !== 'admin') {
