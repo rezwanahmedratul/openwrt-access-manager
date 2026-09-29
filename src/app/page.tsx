@@ -120,8 +120,43 @@ export default function DashboardPage() {
   // Theme Management (Light / Dark Mode)
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
 
-  // Navigation state: 'dashboard' | 'groups' | 'account' | 'settings'
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'groups' | 'account' | 'settings'>('dashboard');
+  // Navigation state: 'dashboard' | 'groups' | 'account' | 'settings' with URL & localStorage persistence
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'groups' | 'account' | 'settings'>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const urlParams = new URLSearchParams(window.location.search);
+        const tabParam = urlParams.get('tab') as 'dashboard' | 'groups' | 'account' | 'settings' | null;
+        const hash = window.location.hash.replace('#', '') as 'dashboard' | 'groups' | 'account' | 'settings';
+        const savedTab = localStorage.getItem('openwrt-active-tab') as 'dashboard' | 'groups' | 'account' | 'settings' | null;
+        const validTabs = ['dashboard', 'groups', 'account', 'settings'] as const;
+
+        if (tabParam && validTabs.includes(tabParam)) return tabParam;
+        if (hash && validTabs.includes(hash)) return hash;
+        if (savedTab && validTabs.includes(savedTab)) return savedTab;
+      } catch {
+        // fallback to dashboard
+      }
+    }
+    return 'dashboard';
+  });
+
+  const handleTabChange = (tab: 'dashboard' | 'groups' | 'account' | 'settings') => {
+    setActiveTab(tab);
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('openwrt-active-tab', tab);
+        const url = new URL(window.location.href);
+        if (tab === 'dashboard') {
+          url.searchParams.delete('tab');
+        } else {
+          url.searchParams.set('tab', tab);
+        }
+        window.history.replaceState(null, '', url.pathname + url.search + url.hash);
+      } catch {
+        // ignore
+      }
+    }
+  };
 
   // User Edit Modal State (Used exclusively for editing existing records)
   const [modalMode, setModalMode] = useState<'EDIT' | null>(null);
@@ -157,6 +192,10 @@ export default function DashboardPage() {
   // History Modal State
   const [showHistory, setShowHistory] = useState(false);
   const [historyList, setHistoryList] = useState<any[]>([]);
+
+  // User Profile Dropdown Menu State
+  const [showUserDropdown, setShowUserDropdown] = useState(false);
+  const userDropdownRef = useRef<HTMLDivElement | null>(null);
 
   // Settings Page State
   const [gatewayIp, setGatewayIp] = useState('192.168.1.1');
@@ -370,6 +409,69 @@ export default function DashboardPage() {
       document.documentElement.setAttribute('data-theme', initial);
     }
   }, []);
+
+  // Synchronize Tab with URL query param / hash / localStorage and handle browser back/forward
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const syncTabFromUrlOrStorage = () => {
+      try {
+        const urlParams = new URLSearchParams(window.location.search);
+        const tabParam = urlParams.get('tab') as 'dashboard' | 'groups' | 'account' | 'settings' | null;
+        const hash = window.location.hash.replace('#', '') as 'dashboard' | 'groups' | 'account' | 'settings';
+        const savedTab = localStorage.getItem('openwrt-active-tab') as 'dashboard' | 'groups' | 'account' | 'settings' | null;
+        const validTabs = ['dashboard', 'groups', 'account', 'settings'] as const;
+
+        const candidate = (tabParam && validTabs.includes(tabParam) ? tabParam : null)
+          || (hash && validTabs.includes(hash) ? hash : null)
+          || (savedTab && validTabs.includes(savedTab) ? savedTab : null);
+
+        if (candidate && validTabs.includes(candidate)) {
+          setActiveTab(candidate);
+          const url = new URL(window.location.href);
+          if (candidate === 'dashboard') {
+            url.searchParams.delete('tab');
+          } else {
+            url.searchParams.set('tab', candidate);
+          }
+          window.history.replaceState(null, '', url.pathname + url.search + url.hash);
+        }
+      } catch {
+        // ignore
+      }
+    };
+
+    syncTabFromUrlOrStorage();
+
+    const onPopState = () => {
+      syncTabFromUrlOrStorage();
+    };
+
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, []);
+
+  // Close user dropdown when clicking outside
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (userDropdownRef.current && !userDropdownRef.current.contains(e.target as Node)) {
+        setShowUserDropdown(false);
+      }
+    };
+    if (showUserDropdown) {
+      document.addEventListener('mousedown', handleOutsideClick);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick);
+    };
+  }, [showUserDropdown]);
+
+  // Safeguard: redirect subadmins if they land on account page
+  useEffect(() => {
+    if (currentUser && currentUser.role === 'subadmin' && activeTab === 'account') {
+      handleTabChange('dashboard');
+    }
+  }, [currentUser, activeTab]);
 
   const switchTheme = (newTheme: 'light' | 'dark') => {
     setTheme(newTheme);
@@ -765,7 +867,7 @@ export default function DashboardPage() {
     try {
       await fetch('/api/auth/logout', { method: 'POST' });
       setCurrentUser(null);
-      setActiveTab('dashboard');
+      handleTabChange('dashboard');
       showToast('Signed out of gateway session');
     } catch {
       setCurrentUser(null);
@@ -1083,7 +1185,7 @@ export default function DashboardPage() {
             <li>
               <button
                 className={`nav-item-btn ${activeTab === 'dashboard' ? 'active' : ''}`}
-                onClick={() => setActiveTab('dashboard')}
+                onClick={() => handleTabChange('dashboard')}
               >
                 <span className="nav-icon">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
@@ -1096,7 +1198,7 @@ export default function DashboardPage() {
             <li>
               <button
                 className={`nav-item-btn ${activeTab === 'groups' ? 'active' : ''}`}
-                onClick={() => setActiveTab('groups')}
+                onClick={() => handleTabChange('groups')}
               >
                 <span className="nav-icon">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -1112,7 +1214,7 @@ export default function DashboardPage() {
             <li>
               <button
                 className={`nav-item-btn ${activeTab === 'account' ? 'active' : ''}`}
-                onClick={() => setActiveTab('account')}
+                onClick={() => handleTabChange('account')}
               >
                 <span className="nav-icon">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -1126,7 +1228,7 @@ export default function DashboardPage() {
             <li>
               <button
                 className={`nav-item-btn ${activeTab === 'settings' ? 'active' : ''}`}
-                onClick={() => setActiveTab('settings')}
+                onClick={() => handleTabChange('settings')}
               >
                 <span className="nav-icon">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -1156,6 +1258,15 @@ export default function DashboardPage() {
       <div className="main-wrapper">
         {/* Minimal Top Bar */}
         <header className="top-header">
+          {/* Mobile Brand Title (shown on mobile devices where sidebar is at bottom) */}
+          <div className="mobile-header-brand">
+            <div className="brand-icon-box" style={{ width: '28px', height: '28px', fontSize: '0.88rem', borderRadius: 'var(--radius-sm)' }}>W</div>
+            <div className="brand-text-col">
+              <span className="brand-title" style={{ fontSize: '0.88rem', lineHeight: 1.1 }}>OpenWrt</span>
+              <span className="brand-subtitle" style={{ fontSize: '0.55rem' }}>GATEWAY</span>
+            </div>
+          </div>
+
           <div className="top-header-actions">
             {/* Direct Configuration Downloads & History */}
             <button className="btn btn-ghost btn-sm" onClick={openHistoryModal} style={{ fontSize: '0.8rem' }}>
@@ -1212,38 +1323,93 @@ export default function DashboardPage() {
               </button>
             </div>
 
-            {/* User Session Profile Badge & Logout */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-              <div
-                className="user-profile-badge"
-                title={`${currentUser.username} (${currentUser.role})`}
-                onClick={() => setActiveTab('account')}
-                style={{
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.45rem',
-                  padding: '0.25rem 0.65rem',
-                  width: 'auto',
-                  height: '32px',
-                  borderRadius: 'var(--radius-pill)',
-                }}
+            {/* Compact Account Avatar & Dropdown Popover */}
+            <div className="user-menu-wrapper" ref={userDropdownRef}>
+              <button
+                type="button"
+                className={`user-avatar-btn ${showUserDropdown ? 'active' : ''}`}
+                onClick={() => setShowUserDropdown((prev) => !prev)}
+                title={`Account: ${currentUser.username} (${currentUser.role})`}
+                aria-label="User Account Menu"
+                aria-expanded={showUserDropdown}
               >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
                   <circle cx="12" cy="7" r="4"/>
                 </svg>
-                <span style={{ fontSize: '0.8rem', fontWeight: 600 }}>{currentUser.username}</span>
-                <span className={`badge-role badge-role-${currentUser.role}`}>{currentUser.role}</span>
-              </div>
-              <button
-                className="btn btn-secondary btn-sm"
-                onClick={handleLogout}
-                title="Sign out of gateway"
-                style={{ fontSize: '0.78rem', padding: '0.35rem 0.65rem', height: '32px' }}
-              >
-                Sign Out
               </button>
+
+              {showUserDropdown && (
+                <div className="user-dropdown-popover">
+                  {/* User Profile Header */}
+                  <div className="user-dropdown-header">
+                    <div className="user-dropdown-avatar">
+                      {currentUser.username.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="user-dropdown-details">
+                      <div className="user-dropdown-name">{currentUser.username}</div>
+                      <div className="user-dropdown-role-row">
+                        <span className={`badge-role badge-role-${currentUser.role}`}>
+                          {currentUser.role}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="user-dropdown-divider" />
+
+                  {/* Dropdown Options */}
+                  <div className="user-dropdown-items">
+                    <button
+                      type="button"
+                      className="user-dropdown-item"
+                      onClick={() => {
+                        setShowUserDropdown(false);
+                        handleTabChange('account');
+                      }}
+                    >
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                        <circle cx="12" cy="7" r="4"/>
+                      </svg>
+                      <span>Account Management</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      className="user-dropdown-item"
+                      onClick={() => {
+                        setShowUserDropdown(false);
+                        handleTabChange('settings');
+                      }}
+                    >
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <circle cx="12" cy="12" r="3"/>
+                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                      </svg>
+                      <span>Gateway Settings</span>
+                    </button>
+
+                    <div className="user-dropdown-divider" />
+
+                    <button
+                      type="button"
+                      className="user-dropdown-item item-danger"
+                      onClick={() => {
+                        setShowUserDropdown(false);
+                        handleLogout();
+                      }}
+                    >
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                        <polyline points="16 17 21 12 16 7"/>
+                        <line x1="21" y1="12" x2="9" y2="12"/>
+                      </svg>
+                      <span>Sign Out</span>
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </header>
@@ -1336,7 +1502,7 @@ export default function DashboardPage() {
                 <div
                   className="stat-card-box"
                   style={{ cursor: 'pointer' }}
-                  onClick={() => setActiveTab('groups')}
+                  onClick={() => handleTabChange('groups')}
                 >
                   <div className="stat-top-row">
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -1680,7 +1846,7 @@ export default function DashboardPage() {
                   </p>
                 </div>
                 <div className="actions-col">
-                  <button className="btn btn-secondary" onClick={() => setActiveTab('dashboard')}>
+                  <button className="btn btn-secondary" onClick={() => handleTabChange('dashboard')}>
                     ← Back to Dashboard
                   </button>
                 </div>
@@ -1869,7 +2035,7 @@ export default function DashboardPage() {
                   </p>
                 </div>
                 <div className="actions-col">
-                  <button className="btn btn-secondary" onClick={() => setActiveTab('dashboard')}>
+                  <button className="btn btn-secondary" onClick={() => handleTabChange('dashboard')}>
                     ← Back to Dashboard
                   </button>
                 </div>
@@ -2061,7 +2227,7 @@ export default function DashboardPage() {
                   </p>
                 </div>
                 <div className="actions-col" style={{ display: 'flex', gap: '0.65rem' }}>
-                  <button className="btn btn-secondary" onClick={() => setActiveTab('dashboard')}>
+                  <button className="btn btn-secondary" onClick={() => handleTabChange('dashboard')}>
                     ← Back to Dashboard
                   </button>
                   <button
@@ -2663,7 +2829,7 @@ export default function DashboardPage() {
                   <label className="form-label-title" style={{ marginBottom: 0 }}>Assigned Groups</label>
                   <button
                     type="button"
-                    onClick={() => { setModalMode(null); setActiveTab('groups'); }}
+                    onClick={() => { setModalMode(null); handleTabChange('groups'); }}
                     style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '0.72rem', cursor: 'pointer', textDecoration: 'underline' }}
                   >
                     Go to Groups Page →

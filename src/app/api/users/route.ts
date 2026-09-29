@@ -21,19 +21,35 @@ export async function GET(request: Request) {
 
   if (isSupabaseConfigured) {
     try {
-      const { data: groupData } = await supabase.from('groups').select('*').order('name');
-      groups = groupData || [];
+      const [
+        { data: groupData },
+        { data: userData },
+        { data: changesData },
+        { data: configData },
+      ] = await Promise.all([
+        supabase.from('groups').select('*').order('name'),
+        supabase
+          .from('users')
+          .select(`
+            id, name, mac_address, created_at, updated_at,
+            user_groups (
+              group_id,
+              groups ( id, name, is_protected, is_no_internet, created_at, updated_at )
+            )
+          `)
+          .order('name'),
+        supabase
+          .from('draft_changes')
+          .select('*')
+          .order('sequence', { ascending: true }),
+        supabase
+          .from('configurations')
+          .select('version, created_at')
+          .eq('is_current', true)
+          .maybeSingle(),
+      ]);
 
-      const { data: userData } = await supabase
-        .from('users')
-        .select(`
-          id, name, mac_address, created_at, updated_at,
-          user_groups (
-            group_id,
-            groups ( id, name, is_protected, is_no_internet, created_at, updated_at )
-          )
-        `)
-        .order('name');
+      groups = groupData || [];
 
       if (userData) {
         appliedUsers = userData.map((u: any) => ({
@@ -46,18 +62,7 @@ export async function GET(request: Request) {
         }));
       }
 
-      const { data: changesData } = await supabase
-        .from('draft_changes')
-        .select('*')
-        .order('sequence', { ascending: true });
-
       draftChanges = changesData || [];
-
-      const { data: configData } = await supabase
-        .from('configurations')
-        .select('version, created_at')
-        .eq('is_current', true)
-        .maybeSingle();
 
       if (configData) {
         currentVersion = configData.version;
