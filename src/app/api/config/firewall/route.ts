@@ -2,6 +2,7 @@ import { getServiceSupabase } from '@/lib/supabase';
 import { generateFirewallConfig } from '@/lib/config-generator';
 import { getMockState } from '@/lib/mock-store';
 import { cacheGet, cacheSet } from '@/lib/cache';
+import { getMacAuthSettings } from '@/lib/mac-auth';
 
 const FIREWALL_CACHE_KEY = 'cache:config:firewall';
 
@@ -45,41 +46,57 @@ export async function GET(request: Request) {
   let content = '';
 
   if (isSupabaseConfigured) {
-    const { data: config } = await supabase
-      .from('configurations')
-      .select('firewall_content')
-      .eq('is_current', true)
-      .maybeSingle();
+    try {
+      const { data: config } = await supabase
+        .from('configurations')
+        .select('firewall_content')
+        .order('version', { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
-    if (!config) {
-      const { data: users } = await supabase
-        .from('users')
-        .select('name, mac_address, user_groups ( groups ( is_no_internet ) )');
-      const mapped = (users || []).map((u: any) => ({
-        name: u.name,
-        mac_address: u.mac_address,
-        is_no_internet: Boolean(u.user_groups?.some((ug: any) => ug.groups?.is_no_internet)),
-      }));
-      const state = getMockState();
-      content = generateFirewallConfig(mapped, state.mockMacAuth.enabled);
-    } else {
-      content = config.firewall_content;
+      if (config && config.firewall_content) {
+        content = config.firewall_content;
+      }
+    } catch (e) {
+      console.error('Error fetching firewall_content from Supabase:', e);
     }
-  } else {
-    const state = getMockState();
-    const mapped = state.mockUsers.map((u) => {
-      const uGroups = u.groups.map((ug) => state.mockGroups.find((mg) => mg.id === ug.id) || ug);
-      return {
-        name: u.name,
-        mac_address: u.mac_address,
-        is_no_internet: Boolean(uGroups.some((g) => g.is_no_internet)),
-      };
-    });
-    content = generateFirewallConfig(mapped, state.mockMacAuth.enabled);
   }
 
-  // Store in Redis / memory cache
-  await cacheSet(FIREWALL_CACHE_KEY, content, 300);
+  if (!content) {
+    const macAuth = await getMacAuthSettings();
+    if (isSupabaseConfigured) {
+      try {
+        const { data: users } = await supabase
+          .from('users')
+          .select('name, mac_address, user_groups ( groups ( is_no_internet ) )')
+          .order('name');
+        const mapped = (users || []).map((u: any) => ({
+          name: u.name,
+          mac_address: u.mac_address,
+          is_no_internet: Boolean(u.user_groups?.some((ug: any) => ug.groups?.is_no_internet)),
+        }));
+        content = generateFirewallConfig(mapped, macAuth.enabled);
+      } catch (e) {
+        console.error('Error generating fallback firewall config from Supabase:', e);
+      }
+    }
+
+    if (!content) {
+      const state = getMockState();
+      const mapped = state.mockUsers.map((u) => {
+        const uGroups = u.groups.map((ug) => state.mockGroups.find((mg) => mg.id === ug.id) || ug);
+        return {
+          name: u.name,
+          mac_address: u.mac_address,
+          is_no_internet: Boolean(uGroups.some((g) => g.is_no_internet)),
+        };
+      });
+      content = generateFirewallConfig(mapped, macAuth.enabled);
+    }
+  }
+
+  // Store in Redis / memory cache (60 seconds)
+  await cacheSet(FIREWALL_CACHE_KEY, content, 60);
 
   return new Response(content, {
     status: 200,

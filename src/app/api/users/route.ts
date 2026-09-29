@@ -4,6 +4,7 @@ import { UserWithGroups, Group, DraftChange, UserViewModel } from '@/lib/types';
 import { normalizeMac } from '@/lib/normalize-mac';
 import { getMockState } from '@/lib/mock-store';
 import { cacheGet, cacheSet } from '@/lib/cache';
+import { getMacAuthSettings } from '@/lib/mac-auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -228,7 +229,7 @@ export async function GET(request: Request) {
         pending_changes: draftChanges.length,
         current_version: currentVersion,
         last_applied: lastApplied,
-        mac_auth: mock.mockMacAuth,
+        mac_auth: await getMacAuthSettings(),
       },
       draft_changes: draftChanges,
     },

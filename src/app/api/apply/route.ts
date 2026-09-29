@@ -3,6 +3,7 @@ import { getServiceSupabase } from '@/lib/supabase';
 import { generateFirewallConfig, generateEthersConfig, computeConfigHash, UserConfigInput } from '@/lib/config-generator';
 import { getMockState } from '@/lib/mock-store';
 import { cacheDelPrefix } from '@/lib/cache';
+import { getMacAuthSettings } from '@/lib/mac-auth';
 
 export async function POST() {
   const supabase = getServiceSupabase();
@@ -107,8 +108,8 @@ export async function POST() {
         is_no_internet: Boolean(u.user_groups?.some((ug: any) => ug.groups?.is_no_internet)),
       }));
 
-      const state = getMockState();
-      const firewallContent = generateFirewallConfig(finalUsers, state.mockMacAuth.enabled);
+      const macAuth = await getMacAuthSettings();
+      const firewallContent = generateFirewallConfig(finalUsers, macAuth.enabled);
       const ethersContent = generateEthersConfig(finalUsers);
       const hash = computeConfigHash(firewallContent, ethersContent);
 
@@ -215,7 +216,8 @@ export async function POST() {
         is_no_internet: Boolean(uGroups.some((g) => g.is_no_internet)),
       };
     });
-    const firewall = generateFirewallConfig(finalUsersForConfig, state.mockMacAuth.enabled);
+    const macAuth = await getMacAuthSettings();
+    const firewall = generateFirewallConfig(finalUsersForConfig, macAuth.enabled);
     const ethers = generateEthersConfig(updatedUsers);
     const hash = computeConfigHash(firewall, ethers);
 

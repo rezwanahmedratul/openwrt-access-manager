@@ -4,6 +4,8 @@ import { getMockState } from '@/lib/mock-store';
 import { getServiceSupabase } from '@/lib/supabase';
 import { generateFirewallConfig, generateEthersConfig, computeConfigHash, UserConfigInput } from '@/lib/config-generator';
 import { MacAuthSettings } from '@/lib/types';
+import { getMacAuthSettings } from '@/lib/mac-auth';
+import { cacheDelPrefix } from '@/lib/cache';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -14,45 +16,10 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const isSupabaseConfigured = Boolean(
-    process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_URL.startsWith('http')
-  );
+  const macAuth = await getMacAuthSettings();
 
-  if (isSupabaseConfigured) {
-    try {
-      const supabase = getServiceSupabase();
-      const { data } = await supabase
-        .from('app_settings')
-        .select('value')
-        .eq('key', 'mac_auth')
-        .maybeSingle();
-
-      if (data && data.value) {
-        let macAuth: MacAuthSettings = data.value;
-        if (!macAuth.enabled && macAuth.disabled_until) {
-          const expiry = new Date(macAuth.disabled_until).getTime();
-          if (!isNaN(expiry) && Date.now() >= expiry) {
-            macAuth = { enabled: true, disabled_until: null, disabled_by_role: undefined };
-            await supabase.from('app_settings').upsert({
-              key: 'mac_auth',
-              value: macAuth,
-              updated_at: new Date().toISOString(),
-            });
-          }
-        }
-        return NextResponse.json({
-          mac_auth: macAuth,
-          current_role: session.role,
-        });
-      }
-    } catch (e) {
-      console.error('Supabase get mac-auth error, falling back to mock:', e);
-    }
-  }
-
-  const state = getMockState();
   return NextResponse.json({
-    mac_auth: state.mockMacAuth,
+    mac_auth: macAuth,
     current_role: session.role,
   });
 }
@@ -114,11 +81,15 @@ export async function POST(request: Request) {
       }
     }
 
+    // Always update in-memory mock store
     state.setMockMacAuth(newMacAuth);
 
     const isSupabaseConfigured = Boolean(
       process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_URL.startsWith('http')
     );
+
+    let nextVersion = state.mockVersion + 1;
+    let configHash = '';
 
     if (isSupabaseConfigured) {
       try {
@@ -131,7 +102,8 @@ export async function POST(request: Request) {
 
         const { data: users } = await supabase
           .from('users')
-          .select('name, mac_address, user_groups ( groups ( is_no_internet ) )');
+          .select('name, mac_address, user_groups ( groups ( is_no_internet ) )')
+          .order('name');
 
         const mapped: UserConfigInput[] = (users || []).map((u: any) => ({
           name: u.name,
@@ -146,15 +118,15 @@ export async function POST(request: Request) {
           .limit(1)
           .maybeSingle();
 
-        const nextVersion = (lastConfig?.version || 0) + 1;
+        nextVersion = (lastConfig?.version || 0) + 1;
         const firewall = generateFirewallConfig(mapped, newMacAuth.enabled);
         const ethers = generateEthersConfig(mapped);
-        const hash = computeConfigHash(firewall, ethers);
+        configHash = computeConfigHash(firewall, ethers);
 
         await supabase.from('configurations').update({ is_current: false }).eq('is_current', true);
         await supabase.from('configurations').insert({
           version: nextVersion,
-          hash,
+          hash: configHash,
           user_count: mapped.length,
           firewall_content: firewall,
           ethers_content: ethers,
@@ -164,22 +136,12 @@ export async function POST(request: Request) {
             applied_at: new Date().toISOString(),
           },
         });
-
-        return NextResponse.json({
-          success: true,
-          mac_auth: newMacAuth,
-          version: nextVersion,
-          hash,
-          message: newMacAuth.enabled
-            ? 'MAC Authentication turned ON (Access restricted to registered MACs)'
-            : `MAC Authentication turned OFF (Open to all devices${newMacAuth.disabled_until ? ` until ${new Date(newMacAuth.disabled_until).toLocaleString()}` : ' permanently'})`,
-        });
       } catch (e) {
         console.error('Supabase update mac-auth error, falling back to mock:', e);
       }
     }
 
-    // Automatically update firewall config and version for mock store
+    // Always keep mock store version & hash in sync as well
     const updatedUsers = state.mockUsers;
     const finalUsersForConfig: UserConfigInput[] = updatedUsers.map((u) => {
       const uGroups = u.groups.map((ug) => state.mockGroups.find((mg) => mg.id === ug.id) || ug);
@@ -190,23 +152,25 @@ export async function POST(request: Request) {
       };
     });
 
-    const nextVer = state.mockVersion + 1;
-    const currentState = getMockState();
-    const firewall = generateFirewallConfig(finalUsersForConfig, currentState.mockMacAuth.enabled);
-    const ethers = generateEthersConfig(updatedUsers);
-    const hash = computeConfigHash(firewall, ethers);
-
-    state.setMockVersion(nextVer);
+    const mockFirewall = generateFirewallConfig(finalUsersForConfig, newMacAuth.enabled);
+    const mockEthers = generateEthersConfig(updatedUsers);
+    if (!configHash) {
+      configHash = computeConfigHash(mockFirewall, mockEthers);
+    }
+    state.setMockVersion(nextVersion);
     state.setMockLastApplied(new Date().toISOString());
+
+    // CRITICAL: Purge all caches immediately so router gets the new version and new hash instantly!
+    await cacheDelPrefix('cache:');
 
     return NextResponse.json({
       success: true,
-      mac_auth: currentState.mockMacAuth,
-      version: nextVer,
-      hash,
-      message: currentState.mockMacAuth.enabled
+      mac_auth: newMacAuth,
+      version: nextVersion,
+      hash: configHash,
+      message: newMacAuth.enabled
         ? 'MAC Authentication turned ON (Access restricted to registered MACs)'
-        : `MAC Authentication turned OFF (Open to all devices${currentState.mockMacAuth.disabled_until ? ` until ${new Date(currentState.mockMacAuth.disabled_until).toLocaleString()}` : ' permanently'})`,
+        : `MAC Authentication turned OFF (Open to all devices${newMacAuth.disabled_until ? ` until ${new Date(newMacAuth.disabled_until).toLocaleString()}` : ' permanently'})`,
     });
   } catch (err: any) {
     return NextResponse.json({ error: err.message || 'Server error' }, { status: 500 });

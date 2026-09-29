@@ -133,6 +133,11 @@ validate_firewall() {
         log_error "Firewall config is empty"
         return 1
     fi
+    # Detect HTML error pages returned by web servers / reverse proxies
+    if grep -qiE '<html|<body|<error' "$_file"; then
+        log_error "Firewall config contains HTML markup (server error page?)"
+        return 1
+    fi
     if ! grep -q "^config " "$_file"; then
         log_error "Firewall config missing 'config' directives — looks invalid"
         return 1
@@ -142,14 +147,14 @@ validate_firewall() {
 
 validate_ethers() {
     _file="$1"
-    # Must be non-empty; ethers file contains MAC-to-IP mappings or hostname entries
-    if [ ! -s "$_file" ]; then
-        log_error "Ethers file is empty"
+    # File must exist
+    if [ ! -f "$_file" ]; then
+        log_error "Ethers file does not exist"
         return 1
     fi
-    # Should contain at least one MAC-like pattern (xx:xx:xx:xx:xx:xx)
-    if ! grep -qiE '[0-9a-f]{2}(:[0-9a-f]{2}){5}' "$_file"; then
-        log_error "Ethers file has no MAC address entries — looks invalid"
+    # Detect HTML error pages returned by web servers / reverse proxies
+    if grep -qiE '<html|<body|<error' "$_file"; then
+        log_error "Ethers file contains HTML markup (server error page?)"
         return 1
     fi
     return 0
@@ -215,12 +220,12 @@ main() {
         _local_hash=$(cat "$HASH_FILE" 2>/dev/null)
     fi
 
-    if [ "$_remote_hash" = "$_local_hash" ]; then
-        log "  Config unchanged — nothing to do."
+    if [ -n "$_remote_hash" ] && [ "$_remote_hash" = "$_local_hash" ]; then
+        log "  Config unchanged (hash: $_remote_hash) — nothing to do."
         exit 0
     fi
 
-    log "  Change detected (local: ${_local_hash:-<none>})  →  downloading new configs..."
+    log "  Change detected (local: ${_local_hash:-<none>}  remote: $_remote_hash)  →  downloading new configs..."
 
     # ── Step 3: Download firewall config ─────────────────────────────────
     _fw_tmp="$TMP_DIR/firewall"

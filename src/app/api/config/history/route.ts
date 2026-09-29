@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServiceSupabase } from '@/lib/supabase';
 import { getMockState } from '@/lib/mock-store';
 import { generateFirewallConfig, generateEthersConfig, computeConfigHash, UserConfigInput } from '@/lib/config-generator';
+import { getMacAuthSettings } from '@/lib/mac-auth';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -31,7 +32,8 @@ export async function GET() {
         is_no_internet: Boolean(uGroups.some((g) => g.is_no_internet)),
       };
     });
-    const firewallContent = generateFirewallConfig(mapped, state.mockMacAuth.enabled);
+    const macAuth = await getMacAuthSettings();
+    const firewallContent = generateFirewallConfig(mapped, macAuth.enabled);
     const ethersContent = generateEthersConfig(state.mockUsers);
     const hash = computeConfigHash(firewallContent, ethersContent);
 

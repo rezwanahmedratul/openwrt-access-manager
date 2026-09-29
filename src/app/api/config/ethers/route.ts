@@ -45,25 +45,39 @@ export async function GET(request: Request) {
   let content = '';
 
   if (isSupabaseConfigured) {
-    const { data: config } = await supabase
-      .from('configurations')
-      .select('ethers_content')
-      .eq('is_current', true)
-      .maybeSingle();
+    try {
+      const { data: config } = await supabase
+        .from('configurations')
+        .select('ethers_content')
+        .order('version', { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
-    if (!config) {
-      const { data: users } = await supabase.from('users').select('name, mac_address');
-      content = generateEthersConfig(users || []);
-    } else {
-      content = config.ethers_content;
+      if (config && config.ethers_content) {
+        content = config.ethers_content;
+      }
+    } catch (e) {
+      console.error('Error fetching ethers_content from Supabase:', e);
     }
-  } else {
-    const state = getMockState();
-    content = generateEthersConfig(state.mockUsers);
   }
 
-  // Cache in Redis/memory
-  await cacheSet(ETHERS_CACHE_KEY, content, 300);
+  if (!content) {
+    if (isSupabaseConfigured) {
+      try {
+        const { data: users } = await supabase.from('users').select('name, mac_address').order('name');
+        content = generateEthersConfig(users || []);
+      } catch (e) {
+        console.error('Error generating fallback ethers config from Supabase:', e);
+      }
+    }
+    if (!content) {
+      const state = getMockState();
+      content = generateEthersConfig(state.mockUsers);
+    }
+  }
+
+  // Cache in Redis/memory (60 seconds)
+  await cacheSet(ETHERS_CACHE_KEY, content, 60);
 
   return new Response(content, {
     status: 200,
