@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { UserViewModel, Group, DashboardStats, SessionUser } from '@/lib/types';
 import { normalizeMac } from '@/lib/normalize-mac';
 import { normalizeName } from '@/lib/normalize-name';
+import { getMacVendor } from '@/lib/mac-vendors';
 
 // ============================================================
 // Minimal Monochrome SVG Icons (Clean Linear / Vercel Style)
@@ -134,17 +135,83 @@ export default function DashboardPage() {
     return () => clearTimeout(handler);
   }, [search]);
 
-  // Instant zero-latency client-side search filtering
+  // Bulk Selection State
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(new Set());
+
+  // Column Sorting State
+  const [sortColumn, setSortColumn] = useState<'name' | 'mac_address' | 'status' | null>(null);
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+
+  // Status Filter State
+  const [statusFilter, setStatusFilter] = useState<'all' | 'applied' | 'added' | 'modified' | 'deleted'>('all');
+
+  // Collapsible Quick Add Form
+  const [isAddFormCollapsed, setIsAddFormCollapsed] = useState(false);
+
+  // MAC Copy Feedback
+  const [copiedMac, setCopiedMac] = useState<string | null>(null);
+
+  // Batch CSV/Text Import State
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importText, setImportText] = useState('');
+  const [importTargetGroup, setImportTargetGroup] = useState<string>('');
+  const [isImporting, setIsImporting] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
+
+  // Bulk Group Assignment Modal State
+  const [showBulkGroupModal, setShowBulkGroupModal] = useState(false);
+  const [bulkTargetGroupId, setBulkTargetGroupId] = useState('');
+  const [isBulkAssigning, setIsBulkAssigning] = useState(false);
+
+  // Instant zero-latency client-side search filtering, status filtering, group filtering, and sorting
   const displayedUsers = useMemo(() => {
-    if (!search.trim()) return users;
-    const q = search.trim().toLowerCase();
-    const cleanQ = q.replace(/[:\-]/g, '');
-    return users.filter((u) => {
-      const nameMatch = u.name.toLowerCase().includes(q);
-      const macMatch = u.mac_address.toLowerCase().replace(/[:\-]/g, '').includes(cleanQ);
-      return nameMatch || macMatch;
-    });
-  }, [users, search]);
+    let result = users;
+
+    // Group filter
+    if (selectedGroup && selectedGroup !== 'ALL') {
+      result = result.filter((u) => u.groups?.some((g) => g.id === selectedGroup));
+    }
+
+    // Text search filter
+    if (search.trim()) {
+      const q = search.trim().toLowerCase();
+      const cleanQ = q.replace(/[:\-]/g, '');
+      result = result.filter((u) => {
+        const nameMatch = u.name.toLowerCase().includes(q);
+        const macMatch = u.mac_address.toLowerCase().replace(/[:\-]/g, '').includes(cleanQ);
+        return nameMatch || macMatch;
+      });
+    }
+
+    // Status filter
+    if (statusFilter !== 'all') {
+      result = result.filter((u) => u.status === statusFilter);
+    }
+
+    // Column sorting
+    if (sortColumn) {
+      result = [...result].sort((a, b) => {
+        let valA = '';
+        let valB = '';
+        if (sortColumn === 'name') {
+          valA = a.name.toLowerCase();
+          valB = b.name.toLowerCase();
+        } else if (sortColumn === 'mac_address') {
+          valA = a.mac_address.toLowerCase();
+          valB = b.mac_address.toLowerCase();
+        } else if (sortColumn === 'status') {
+          valA = a.status || '';
+          valB = b.status || '';
+        }
+        if (valA < valB) return sortDirection === 'asc' ? -1 : 1;
+        if (valA > valB) return sortDirection === 'asc' ? 1 : -1;
+        return 0;
+      });
+    }
+
+    return result;
+  }, [users, search, statusFilter, selectedGroup, sortColumn, sortDirection]);
 
   // Redis / In-memory Cache Diagnostics state
   const [cacheInfo, setCacheInfo] = useState<{ engine: string; connected: boolean; keysCount: number; pingMs: number } | null>(null);
@@ -208,6 +275,21 @@ export default function DashboardPage() {
   const macInputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const nameInputRef = useRef<HTMLInputElement | null>(null);
 
+  // Quick Add Device Derived Vendor & Duplicate Check
+  const quickAddMacString = useMemo(() => macOctets.join(':').toUpperCase(), [macOctets]);
+  const quickAddVendor = useMemo(() => {
+    if (macOctets.slice(0, 3).every((o) => o.trim().length === 2)) {
+      return getMacVendor(quickAddMacString);
+    }
+    return null;
+  }, [macOctets, quickAddMacString]);
+  const quickAddDuplicate = useMemo(() => {
+    if (macOctets.every((o) => o.trim().length === 2)) {
+      return users.find((u) => u.status !== 'deleted' && u.mac_address.toUpperCase() === quickAddMacString) || null;
+    }
+    return null;
+  }, [macOctets, users, quickAddMacString]);
+
   // Group Page State (creating new group)
   const [newGroupName, setNewGroupName] = useState('');
   const [newGroupIsProtected, setNewGroupIsProtected] = useState(false);
@@ -258,6 +340,295 @@ export default function DashboardPage() {
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
     setNotification({ message, type });
     setTimeout(() => setNotification(null), 4000);
+  };
+
+  // Clear bulk selection when data changes
+  useEffect(() => {
+    setSelectedUserIds(new Set());
+  }, [users]);
+
+  // Toggle column sort
+  const handleSortToggle = (column: 'name' | 'mac_address' | 'status') => {
+    if (sortColumn === column) {
+      setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortColumn(column);
+      setSortDirection('asc');
+    }
+  };
+
+  // Sort indicator arrow
+  const sortArrow = (column: string) => {
+    if (sortColumn !== column) return '';
+    return sortDirection === 'asc' ? ' ↑' : ' ↓';
+  };
+
+  // Selectable users (excludes deleted users and protected users for subadmins)
+  const selectableUsers = useMemo(() => {
+    return displayedUsers.filter(
+      (u) => u.status !== 'deleted' && !(currentUser?.role === 'subadmin' && u.groups?.some((g) => g.is_protected))
+    );
+  }, [displayedUsers, currentUser]);
+
+  // Toggle selection mode on/off
+  const handleToggleSelectionMode = () => {
+    setIsSelectionMode((prev) => {
+      if (prev) {
+        setSelectedUserIds(new Set());
+      }
+      return !prev;
+    });
+  };
+
+  // Bulk select all visible selectable users
+  const handleToggleSelectAll = () => {
+    if (selectableUsers.length > 0 && selectedUserIds.size === selectableUsers.length) {
+      setSelectedUserIds(new Set());
+    } else {
+      setSelectedUserIds(new Set(selectableUsers.map((u) => u.id)));
+    }
+  };
+
+  // Bulk select/deselect single user
+  const handleToggleSelectUser = (userId: string) => {
+    setSelectedUserIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(userId)) {
+        next.delete(userId);
+      } else {
+        next.add(userId);
+      }
+      return next;
+    });
+  };
+
+  // Bulk delete selected users
+  const handleBulkDelete = async () => {
+    if (selectedUserIds.size === 0) return;
+
+    const targetUsers = users.filter((u) => {
+      if (!selectedUserIds.has(u.id)) return false;
+      if (u.status === 'deleted') return false;
+      if (currentUser?.role === 'subadmin' && u.groups?.some((g) => g.is_protected)) return false;
+      return true;
+    });
+
+    if (targetUsers.length === 0) {
+      showToast('No eligible users to delete (already deleted or protected)', 'error');
+      setSelectedUserIds(new Set());
+      return;
+    }
+
+    const confirmBulk = window.confirm(`Queue deletion for ${targetUsers.length} selected user(s)? Changes remain pending until applied.`);
+    if (!confirmBulk) return;
+
+    let successCount = 0;
+    let failCount = 0;
+    for (const u of targetUsers) {
+      try {
+        const res = await fetch('/api/draft', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ operation: 'DELETE', user_id: u.id }),
+        });
+        if (res.ok) successCount++;
+        else failCount++;
+      } catch {
+        failCount++;
+      }
+    }
+
+    setSelectedUserIds(new Set());
+    if (failCount > 0) {
+      showToast(`Queued ${successCount} deletion(s), ${failCount} failed`, 'error');
+    } else {
+      showToast(`${successCount} user(s) queued for deletion`);
+    }
+    fetchData();
+  };
+
+  // Copy MAC address to clipboard
+  const handleCopyMac = async (mac: string) => {
+    try {
+      await navigator.clipboard.writeText(mac);
+      setCopiedMac(mac);
+      setTimeout(() => setCopiedMac(null), 1500);
+    } catch {
+      // fallback: do nothing
+    }
+  };
+
+  // Export users as CSV
+  const handleExportCSV = () => {
+    const header = 'Name,MAC Address,Status,Groups';
+    const rows = users.map((u) => {
+      const groupNames = u.groups?.map((g) => g.name).join('; ') || 'Default';
+      return `"${u.name}","${u.mac_address}","${u.status}","${groupNames}"`;
+    });
+    const csv = [header, ...rows].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `openwrt-users-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast(`Exported ${users.length} users as CSV`);
+  };
+
+  // Manual refresh
+  const handleRefreshData = () => {
+    fetchData(debouncedSearch, selectedGroup);
+    showToast('Data refreshed');
+  };
+
+  // Batch Import Parser
+  const parsedImportItems = useMemo(() => {
+    if (!importText.trim()) return [];
+    const lines = importText.split('\n');
+    return lines
+      .map((line, idx) => {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith('#')) return null;
+        let parts = trimmed.split(/[,;\t]/).map((p) => p.trim());
+        if (parts.length === 1) {
+          const ws = trimmed.split(/\s+/);
+          if (ws.length >= 2) {
+            parts = [ws[0], ws.slice(1).join(' ')];
+          }
+        }
+        const rawMac = parts[0] || '';
+        const rawName = parts[1] || '';
+        const rawGroupName = parts[2] || '';
+
+        const macRes = normalizeMac(rawMac);
+        const nameRes = normalizeName(rawName);
+
+        const isDuplicateExisting =
+          macRes.valid &&
+          users.some(
+            (u) => u.status !== 'deleted' && u.mac_address.toUpperCase() === macRes.normalized.toUpperCase()
+          );
+
+        let matchedGroup = groups.find((g) => g.name.toLowerCase() === rawGroupName.toLowerCase());
+        if (!matchedGroup && importTargetGroup) {
+          matchedGroup = groups.find((g) => g.id === importTargetGroup);
+        }
+        if (!matchedGroup) {
+          matchedGroup = groups.find((g) => g.name.toLowerCase() === 'default') || groups[0];
+        }
+
+        const vendor = macRes.valid ? getMacVendor(macRes.normalized) : null;
+
+        return {
+          id: `import-${idx}`,
+          raw: line,
+          rawMac,
+          rawName,
+          mac: macRes.valid ? macRes.normalized : rawMac,
+          name: nameRes.valid ? nameRes.normalized : rawName,
+          vendor,
+          group: matchedGroup,
+          isValid: macRes.valid && nameRes.valid,
+          error: !macRes.valid ? macRes.error : !nameRes.valid ? nameRes.error : null,
+          isDuplicate: isDuplicateExisting,
+        };
+      })
+      .filter(Boolean) as {
+        id: string;
+        raw: string;
+        rawMac: string;
+        rawName: string;
+        mac: string;
+        name: string;
+        vendor: string | null;
+        group: Group | undefined;
+        isValid: boolean;
+        error?: string | null;
+        isDuplicate: boolean;
+      }[];
+  }, [importText, users, groups, importTargetGroup]);
+
+  // Execute Batch Import
+  const handleExecuteImport = async () => {
+    const validItems = parsedImportItems.filter((item) => item.isValid);
+    if (validItems.length === 0) {
+      setImportError('No valid devices found to import.');
+      return;
+    }
+
+    setIsImporting(true);
+    setImportError(null);
+
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const item of validItems) {
+      try {
+        const res = await fetch('/api/draft', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            operation: 'ADD',
+            name: item.name,
+            mac_address: item.mac,
+            group_ids: item.group ? [item.group.id] : [],
+          }),
+        });
+        if (res.ok) {
+          successCount++;
+        } else {
+          failCount++;
+        }
+      } catch {
+        failCount++;
+      }
+    }
+
+    setIsImporting(false);
+    setShowImportModal(false);
+    setImportText('');
+    showToast(`Imported ${successCount} devices to pending drafts${failCount > 0 ? ` (${failCount} failed)` : ''}`);
+    fetchData();
+  };
+
+  // Bulk Group Assignment
+  const handleExecuteBulkGroupAssign = async () => {
+    if (!bulkTargetGroupId || selectedUserIds.size === 0) return;
+    setIsBulkAssigning(true);
+
+    const targetUsers = users.filter((u) => {
+      if (!selectedUserIds.has(u.id)) return false;
+      if (u.status === 'deleted') return false;
+      if (currentUser?.role === 'subadmin' && u.groups?.some((g) => g.is_protected)) return false;
+      return true;
+    });
+    let count = 0;
+
+    for (const u of targetUsers) {
+      try {
+        await fetch('/api/draft', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            operation: 'MODIFY',
+            user_id: u.id,
+            name: u.name,
+            mac_address: u.mac_address,
+            group_ids: [bulkTargetGroupId],
+          }),
+        });
+        count++;
+      } catch {
+        // continue
+      }
+    }
+
+    setIsBulkAssigning(false);
+    setShowBulkGroupModal(false);
+    setSelectedUserIds(new Set());
+    showToast(`Updated ${count} users to selected group`);
+    fetchData();
   };
 
   const formatDateTime = (dateStr?: string | null) => {
@@ -513,13 +884,6 @@ export default function DashboardPage() {
       document.removeEventListener('mousedown', handleOutsideClick);
     };
   }, [showUserDropdown]);
-
-  // Safeguard: redirect subadmins if they land on account page
-  useEffect(() => {
-    if (currentUser && currentUser.role === 'subadmin' && activeTab === 'account') {
-      handleTabChange('dashboard');
-    }
-  }, [currentUser, activeTab]);
 
   const switchTheme = (newTheme: 'light' | 'dark') => {
     setTheme(newTheme);
@@ -1629,7 +1993,7 @@ export default function DashboardPage() {
                       <span>Download Ethers Config</span>
                     </a>
 
-                    {currentUser?.role === 'admin' && (
+                    {currentUser && (
                       <button
                         type="button"
                         className="user-dropdown-item"
@@ -1845,13 +2209,33 @@ export default function DashboardPage() {
                     </svg>
                     <span>Quick Register Device</span>
                   </div>
+                  <button
+                    type="button"
+                    className="btn-text-action"
+                    onClick={() => setIsAddFormCollapsed((v) => !v)}
+                    style={{ fontSize: '0.72rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ transform: isAddFormCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)', transition: 'transform 0.2s ease' }}>
+                      <polyline points="6 9 12 15 18 9" />
+                    </svg>
+                    <span>{isAddFormCollapsed ? 'Expand' : 'Collapse'}</span>
+                  </button>
                 </div>
 
+                {!isAddFormCollapsed && (
+                <>
                 <form className="horizontal-add-form" onSubmit={handleAddUserDirect}>
                   {/* Field 1: MAC Address (6 separate 2-character boxes) */}
                   <div className="add-bar-field field-mac">
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.3rem' }}>
-                      <label className="add-bar-label" style={{ margin: 0 }}>MAC Address</label>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                        <label className="add-bar-label" style={{ margin: 0 }}>MAC Address</label>
+                        {quickAddVendor && (
+                          <span className="quick-add-vendor-chip" title="Hardware Manufacturer">
+                            {quickAddVendor}
+                          </span>
+                        )}
+                      </div>
                       <button
                         type="button"
                         onClick={handlePasteClipboardDirect}
@@ -1888,6 +2272,12 @@ export default function DashboardPage() {
                         </React.Fragment>
                       ))}
                     </div>
+                    {quickAddDuplicate && (
+                      <div className="quick-add-dup-warning">
+                        <span>⚠️</span>
+                        <span>Notice: MAC already registered to &quot;{quickAddDuplicate.name}&quot;</span>
+                      </div>
+                    )}
                   </div>
 
                   {/* Field 2: Name */}
@@ -1966,6 +2356,7 @@ export default function DashboardPage() {
                     <span>{addError}</span>
                   </div>
                 )}
+                </>)}
               </div>
 
               {/* Search / Filter Container */}
@@ -1984,6 +2375,20 @@ export default function DashboardPage() {
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                   />
+                  {search && (
+                    <button
+                      type="button"
+                      className="search-clear-btn"
+                      onClick={() => setSearch('')}
+                      title="Clear search"
+                      aria-label="Clear search"
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                      </svg>
+                    </button>
+                  )}
                 </div>
 
                 <select
@@ -1998,6 +2403,144 @@ export default function DashboardPage() {
                     </option>
                   ))}
                 </select>
+
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  onClick={handleRefreshData}
+                  title="Refresh data"
+                  style={{ padding: '0.45rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                >
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <polyline points="1 4 1 10 7 10"/>
+                    <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
+                  </svg>
+                </button>
+              </div>
+
+              {/* Status Filter Chips + Results Count + Actions */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.65rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                  {(['all', 'applied', 'added', 'modified', 'deleted'] as const).map((status) => {
+                    const counts: Record<string, number> = {
+                      all: users.length,
+                      applied: users.filter((u) => u.status === 'applied').length,
+                      added: users.filter((u) => u.status === 'added').length,
+                      modified: users.filter((u) => u.status === 'modified').length,
+                      deleted: users.filter((u) => u.status === 'deleted').length,
+                    };
+                    if (status !== 'all' && counts[status] === 0) return null;
+                    return (
+                      <button
+                        key={status}
+                        type="button"
+                        className={`status-filter-chip ${statusFilter === status ? 'active' : ''}`}
+                        onClick={() => setStatusFilter(status)}
+                      >
+                        <span style={{ textTransform: 'capitalize' }}>{status}</span>
+                        <span className="status-filter-count">{counts[status]}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>
+                    {displayedUsers.length === users.length
+                      ? `${users.length} users`
+                      : `${displayedUsers.length} of ${users.length}`}
+                  </span>
+
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    onClick={handleExportCSV}
+                    style={{ fontSize: '0.75rem', padding: '0.3rem 0.65rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
+                    title="Export all users as CSV"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                      <polyline points="7 10 12 15 17 10" />
+                      <line x1="12" y1="15" x2="12" y2="3" />
+                    </svg>
+                    <span>CSV</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    onClick={() => setShowImportModal(true)}
+                    style={{ fontSize: '0.75rem', padding: '0.3rem 0.65rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
+                    title="Batch import devices from CSV or text"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                      <polyline points="17 8 12 3 7 8" />
+                      <line x1="12" y1="3" x2="12" y2="15" />
+                    </svg>
+                    <span>Import</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    className={`btn btn-sm ${isSelectionMode ? 'btn-primary' : 'btn-ghost'}`}
+                    onClick={handleToggleSelectionMode}
+                    style={{
+                      fontSize: '0.75rem',
+                      padding: '0.3rem 0.65rem',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.3rem',
+                    }}
+                    title={isSelectionMode ? 'Exit selection mode' : 'Select multiple devices'}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      {isSelectionMode ? (
+                        <polyline points="20 6 9 17 4 12" />
+                      ) : (
+                        <>
+                          <rect x="3" y="3" width="18" height="18" rx="2" />
+                          <path d="m9 12 2 2 4-4" />
+                        </>
+                      )}
+                    </svg>
+                    <span>{isSelectionMode ? 'Done' : 'Select'}</span>
+                  </button>
+
+                  {isSelectionMode && selectedUserIds.size > 0 && (
+                    <>
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-sm"
+                        onClick={() => setShowBulkGroupModal(true)}
+                        style={{ fontSize: '0.75rem', padding: '0.3rem 0.65rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
+                        title="Assign selected users to group"
+                      >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                          <circle cx="9" cy="7" r="4" />
+                          <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                          <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                        </svg>
+                        <span>Group ({selectedUserIds.size})</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-sm"
+                        onClick={handleBulkDelete}
+                        style={{ fontSize: '0.75rem', padding: '0.3rem 0.65rem', color: '#ef4444', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
+                        title="Delete selected users"
+                      >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <polyline points="3 6 5 6 21 6" />
+                          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                        </svg>
+                        <span>Delete ({selectedUserIds.size})</span>
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
 
               {/* User Table */}
@@ -2005,9 +2548,39 @@ export default function DashboardPage() {
                 <table className="data-table">
                   <thead>
                     <tr>
-                      <th style={{ width: '150px' }}>STATUS</th>
-                      <th>NAME</th>
-                      <th>MAC ADDRESS</th>
+                      {isSelectionMode && (
+                        <th className="cell-checkbox" style={{ width: '44px', padding: '0.75rem 0.5rem 0.75rem 1rem' }}>
+                          <input
+                            type="checkbox"
+                            checked={selectableUsers.length > 0 && selectedUserIds.size === selectableUsers.length}
+                            onChange={handleToggleSelectAll}
+                            disabled={selectableUsers.length === 0}
+                            style={{ cursor: selectableUsers.length === 0 ? 'not-allowed' : 'pointer', width: '15px', height: '15px', accentColor: 'var(--text-primary)' }}
+                            title={selectableUsers.length === 0 ? 'No selectable users' : 'Select all'}
+                          />
+                        </th>
+                      )}
+                      <th
+                        style={{ width: '130px', cursor: 'pointer', userSelect: 'none' }}
+                        onClick={() => handleSortToggle('status')}
+                        title="Sort by status"
+                      >
+                        STATUS{sortArrow('status')}
+                      </th>
+                      <th
+                        style={{ cursor: 'pointer', userSelect: 'none' }}
+                        onClick={() => handleSortToggle('name')}
+                        title="Sort by name"
+                      >
+                        NAME{sortArrow('name')}
+                      </th>
+                      <th
+                        style={{ cursor: 'pointer', userSelect: 'none' }}
+                        onClick={() => handleSortToggle('mac_address')}
+                        title="Sort by MAC"
+                      >
+                        MAC ADDRESS{sortArrow('mac_address')}
+                      </th>
                       <th>ASSIGNED GROUPS</th>
                       <th style={{ textAlign: 'right', width: '150px' }}>ACTIONS</th>
                     </tr>
@@ -2015,7 +2588,7 @@ export default function DashboardPage() {
                   <tbody>
                     {displayedUsers.length === 0 ? (
                       <tr>
-                        <td colSpan={5} style={{ textAlign: 'center', padding: '3.5rem' }}>
+                        <td colSpan={isSelectionMode ? 6 : 5} style={{ textAlign: 'center', padding: '3.5rem' }}>
                           {loading ? (
                             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem' }}>
                               <div className="loading-spinner"></div>
@@ -2040,8 +2613,29 @@ export default function DashboardPage() {
                     ) : (
                       displayedUsers.map((u) => {
                         const isNoInternetUser = u.groups?.some((g) => g.is_no_internet);
+                        const isProtectedFromSubadmin = currentUser?.role === 'subadmin' && u.groups?.some((g) => g.is_protected);
+                        const isDeleted = u.status === 'deleted';
+                        const isSelectable = !isDeleted && !isProtectedFromSubadmin;
                         return (
-                          <tr key={u.id} className="user-row-card" style={{ opacity: u.status === 'deleted' ? 0.4 : 1 }}>
+                          <tr key={u.id} className={`user-row-card ${isSelectionMode ? 'has-selection-mode' : ''}`} style={{ opacity: isDeleted ? 0.4 : 1 }}>
+                            {isSelectionMode && (
+                              <td className="cell-checkbox">
+                                <input
+                                  type="checkbox"
+                                  disabled={!isSelectable}
+                                  checked={selectedUserIds.has(u.id)}
+                                  onChange={() => handleToggleSelectUser(u.id)}
+                                  style={{
+                                    cursor: isSelectable ? 'pointer' : 'not-allowed',
+                                    width: '15px',
+                                    height: '15px',
+                                    accentColor: 'var(--text-primary)',
+                                    opacity: isSelectable ? 1 : 0.35,
+                                  }}
+                                  title={isProtectedFromSubadmin ? 'Protected user (Admin only)' : isDeleted ? 'Already marked for deletion' : undefined}
+                                />
+                              </td>
+                            )}
                             <td className="cell-status">
                               {isNoInternetUser ? (
                                 <span className="badge-no-internet" title="Internet access blocked by firewall rule">
@@ -2059,7 +2653,31 @@ export default function DashboardPage() {
                               <span className="user-name-cell">{u.name}</span>
                             </td>
                             <td className="cell-mac">
-                              <span className="mac-address-pill">{u.mac_address}</span>
+                              <div style={{ display: 'inline-flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.35rem' }}>
+                                <span
+                                  className="mac-address-pill"
+                                  onClick={() => handleCopyMac(u.mac_address)}
+                                  style={{ cursor: 'pointer' }}
+                                  title={copiedMac === u.mac_address ? 'Copied!' : 'Click to copy'}
+                                >
+                                  {copiedMac === u.mac_address ? (
+                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
+                                      <IconCheck size={11} style={{ color: 'var(--status-applied-dot)' }} />
+                                      <span>Copied</span>
+                                    </span>
+                                  ) : (
+                                    u.mac_address
+                                  )}
+                                </span>
+                                {(() => {
+                                  const vendor = getMacVendor(u.mac_address);
+                                  return vendor ? (
+                                    <span className="mac-vendor-pill" title={`Manufacturer: ${vendor}`}>
+                                      {vendor}
+                                    </span>
+                                  ) : null;
+                                })()}
+                              </div>
                             </td>
                             <td className="cell-groups">
                               <div className="group-tags-wrap">
@@ -2068,11 +2686,17 @@ export default function DashboardPage() {
                                     <span
                                       key={g.id}
                                       className="group-tag-pill"
-                                      style={
-                                        g.is_no_internet
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setSelectedGroup(g.id);
+                                      }}
+                                      style={{
+                                        cursor: 'pointer',
+                                        ...(g.is_no_internet
                                           ? { borderColor: 'rgba(220, 38, 38, 0.4)', background: 'rgba(220, 38, 38, 0.08)' }
-                                          : undefined
-                                      }
+                                          : undefined),
+                                      }}
+                                      title={`Click to filter by "${g.name}"`}
                                     >
                                       {g.is_no_internet && (
                                         <IconBan size={11} style={{ marginRight: '0.25rem' }} />
@@ -2351,7 +2975,7 @@ export default function DashboardPage() {
 
               {/* My Account Card */}
               <div className="account-info-box">
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '0.85rem', borderBottom: '1px solid var(--border-subtle)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '0.85rem', borderBottom: '1px solid var(--border-subtle)', flexWrap: 'wrap', gap: '0.75rem' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                     <div className="brand-icon-box" style={{ width: '36px', height: '36px', fontSize: '1rem' }}>
                       {currentUser.username[0]?.toUpperCase()}
@@ -2361,7 +2985,25 @@ export default function DashboardPage() {
                       <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Active authenticated session</div>
                     </div>
                   </div>
-                  <span className={`badge-role badge-role-${currentUser.role}`}>{currentUser.role}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                    <span className={`badge-role badge-role-${currentUser.role}`}>{currentUser.role}</span>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => openPasswordModal({
+                        id: currentUser.id,
+                        username: currentUser.username,
+                        role: currentUser.role,
+                      })}
+                      style={{ fontSize: '0.78rem', padding: '0.35rem 0.75rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+                    >
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                        <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                      </svg>
+                      <span>Change Password</span>
+                    </button>
+                  </div>
                 </div>
 
                 <div className="account-details-grid">
@@ -3656,8 +4298,8 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Change Password Modal (Admin Only) */}
-      {passwordModalAccount && currentUser?.role === 'admin' && (
+      {/* Change Password Modal */}
+      {passwordModalAccount && (
         <div className="modal-backdrop">
           <div className="modal-card" style={{ maxWidth: '440px' }}>
             <div className="modal-header-row">
@@ -3761,6 +4403,216 @@ export default function DashboardPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Batch Import Modal */}
+      {showImportModal && (
+        <div className="modal-backdrop">
+          <div className="import-modal-card">
+            <div className="modal-header-row" style={{ marginBottom: '0.75rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="17 8 12 3 7 8" />
+                  <line x1="12" y1="3" x2="12" y2="15" />
+                </svg>
+                <h3 className="modal-headline" style={{ margin: 0, fontSize: '1.15rem' }}>Batch Import Devices</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowImportModal(false);
+                  setImportError(null);
+                }}
+                className="modal-close-icon"
+                aria-label="Close"
+              >
+                <IconClose size={14} />
+              </button>
+            </div>
+
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.4 }}>
+              Paste devices below (one per line). Supported format: <code>MAC, Name [, Group]</code> or <code>MAC Name</code>.
+              Delimiters (comma, semicolon, tab, space) are automatically parsed.
+            </p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+              <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                Device List
+              </label>
+              <textarea
+                className="import-textarea"
+                placeholder={`00:11:22:33:44:55, Office Laptop, Staff\n0C-F3-46-F3-CC-A9 Guest Tablet\nB8:27:EB:12:34:56, Sensor Node, Default`}
+                value={importText}
+                onChange={(e) => {
+                  setImportText(e.target.value);
+                  setImportError(null);
+                }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+              <div style={{ flex: 1, minWidth: '180px' }}>
+                <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-primary)', display: 'block', marginBottom: '0.25rem' }}>
+                  Fallback Group
+                </label>
+                <select
+                  className="form-input-element"
+                  value={importTargetGroup}
+                  onChange={(e) => setImportTargetGroup(e.target.value)}
+                  style={{ fontSize: '0.8rem', padding: '0.4rem 0.6rem' }}
+                >
+                  <option value="">Default Group</option>
+                  {groups.map((g) => (
+                    <option key={g.id} value={g.id}>
+                      {g.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', alignSelf: 'flex-end' }}>
+                <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                  {parsedImportItems.length} parsed ({parsedImportItems.filter((i) => i.isValid).length} valid)
+                </span>
+              </div>
+            </div>
+
+            {/* Preview Section */}
+            {parsedImportItems.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                  Import Preview:
+                </span>
+                <div className="import-preview-wrap">
+                  {parsedImportItems.map((item) => (
+                    <div key={item.id} className="import-preview-item">
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                        <span style={{ fontWeight: 600, fontFamily: 'var(--font-mono, monospace)' }}>
+                          {item.mac}
+                        </span>
+                        <span>{item.name}</span>
+                        {item.vendor && (
+                          <span className="mac-vendor-pill" style={{ fontSize: '0.65rem' }}>
+                            {item.vendor}
+                          </span>
+                        )}
+                        {item.group && (
+                          <span className="group-tag-pill" style={{ fontSize: '0.65rem' }}>
+                            {item.group.name}
+                          </span>
+                        )}
+                        {item.isDuplicate && (
+                          <span style={{ fontSize: '0.68rem', color: '#f59e0b', fontWeight: 600 }}>
+                            ⚠️ Duplicate
+                          </span>
+                        )}
+                      </div>
+                      {!item.isValid && (
+                        <span style={{ color: '#ef4444', fontSize: '0.7rem' }}>
+                          {item.error || 'Invalid format'}
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {importError && (
+              <div style={{ fontSize: '0.75rem', color: '#ef4444', background: 'rgba(239, 68, 68, 0.1)', padding: '0.5rem', borderRadius: 'var(--radius-sm)' }}>
+                {importError}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.65rem', marginTop: '0.5rem' }}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => {
+                  setShowImportModal(false);
+                  setImportError(null);
+                }}
+                disabled={isImporting}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={handleExecuteImport}
+                disabled={isImporting || parsedImportItems.filter((i) => i.isValid).length === 0}
+              >
+                {isImporting
+                  ? 'Importing...'
+                  : `Import ${parsedImportItems.filter((i) => i.isValid).length} Devices`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Group Assignment Modal */}
+      {showBulkGroupModal && (
+        <div className="modal-backdrop">
+          <div className="modal-card" style={{ maxWidth: '440px' }}>
+            <div className="modal-header-row">
+              <h3 className="modal-headline">Assign Group</h3>
+              <button
+                type="button"
+                onClick={() => setShowBulkGroupModal(false)}
+                className="modal-close-icon"
+                aria-label="Close"
+              >
+                <IconClose size={13} />
+              </button>
+            </div>
+
+            <p style={{ fontSize: '0.825rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}>
+              Assign <strong>{selectedUserIds.size} selected device(s)</strong> to a group. Changes will remain in pending draft status until applied.
+            </p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem', marginBottom: '1.25rem' }}>
+              <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                Select Target Group
+              </label>
+              <select
+                className="form-input-element"
+                value={bulkTargetGroupId}
+                onChange={(e) => setBulkTargetGroupId(e.target.value)}
+              >
+                <option value="">-- Choose Group --</option>
+                {groups.map((g) => {
+                  const isRestricted = currentUser?.role === 'subadmin' && g.is_protected;
+                  return (
+                    <option key={g.id} value={g.id} disabled={isRestricted}>
+                      {g.name} {g.is_no_internet ? '(No Internet)' : ''} {g.is_protected ? '(Protected)' : ''}
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.65rem' }}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setShowBulkGroupModal(false)}
+                disabled={isBulkAssigning}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={handleExecuteBulkGroupAssign}
+                disabled={!bulkTargetGroupId || isBulkAssigning}
+              >
+                {isBulkAssigning ? 'Updating...' : `Assign to ${selectedUserIds.size} Device(s)`}
+              </button>
+            </div>
           </div>
         </div>
       )}

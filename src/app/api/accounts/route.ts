@@ -207,8 +207,8 @@ export async function DELETE(request: Request) {
 
 export async function PATCH(request: Request) {
   const session = getSessionFromRequest(request);
-  if (!session || session.role !== 'admin') {
-    return NextResponse.json({ error: 'Unauthorized: Only administrators can change account passwords' }, { status: 403 });
+  if (!session) {
+    return NextResponse.json({ error: 'Unauthorized: Session required' }, { status: 401 });
   }
 
   try {
@@ -216,6 +216,16 @@ export async function PATCH(request: Request) {
 
     if ((!id && !username) || !password) {
       return NextResponse.json({ error: 'Account identifier and new password are required' }, { status: 400 });
+    }
+
+    // Role check: Admin can update any account; Subadmin can only update their own account
+    const isSelfUpdate = Boolean(
+      (id && session.id === id) ||
+      (username && session.username.toLowerCase() === String(username).trim().toLowerCase())
+    );
+
+    if (session.role !== 'admin' && !isSelfUpdate) {
+      return NextResponse.json({ error: 'Unauthorized: Subadmins can only change their own password' }, { status: 403 });
     }
 
     const cleanPassword = String(password).trim();
@@ -242,6 +252,10 @@ export async function PATCH(request: Request) {
 
         if (findError || !existing) {
           return NextResponse.json({ error: 'Account not found' }, { status: 404 });
+        }
+
+        if (session.role !== 'admin' && existing.id !== session.id && existing.username.toLowerCase() !== session.username.toLowerCase()) {
+          return NextResponse.json({ error: 'Unauthorized: Cannot change another account password' }, { status: 403 });
         }
 
         const { error: updateError } = await supabase
@@ -290,6 +304,11 @@ export async function PATCH(request: Request) {
 
     const updatedAccounts = [...state.mockAccounts];
     const targetAccount = updatedAccounts[accountIndex];
+
+    if (session.role !== 'admin' && targetAccount.id !== session.id && targetAccount.username.toLowerCase() !== session.username.toLowerCase()) {
+      return NextResponse.json({ error: 'Unauthorized: Cannot change another account password' }, { status: 403 });
+    }
+
     updatedAccounts[accountIndex] = {
       ...targetAccount,
       password_hash: cleanPassword,
