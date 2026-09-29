@@ -6,6 +6,14 @@ const nextConfig = {
   experimental: {
     serverComponentsExternalPackages: ['ioredis'],
   },
+  async rewrites() {
+    return [
+      { source: '/history', destination: '/?tab=history' },
+      { source: '/groups', destination: '/?tab=groups' },
+      { source: '/account', destination: '/?tab=account' },
+      { source: '/settings', destination: '/?tab=settings' },
+    ];
+  },
 };
 
 export default nextConfig;

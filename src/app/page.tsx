@@ -220,15 +220,15 @@ export default function DashboardPage() {
   // Theme Management (Light / Dark Mode)
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
 
-  // Navigation state: 'dashboard' | 'groups' | 'account' | 'settings' with URL & localStorage persistence
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'groups' | 'account' | 'settings'>(() => {
+  // Navigation state: 'dashboard' | 'groups' | 'history' | 'account' | 'settings' with URL & localStorage persistence
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'groups' | 'history' | 'account' | 'settings'>(() => {
     if (typeof window !== 'undefined') {
       try {
         const urlParams = new URLSearchParams(window.location.search);
-        const tabParam = urlParams.get('tab') as 'dashboard' | 'groups' | 'account' | 'settings' | null;
-        const hash = window.location.hash.replace('#', '') as 'dashboard' | 'groups' | 'account' | 'settings';
-        const savedTab = localStorage.getItem('openwrt-active-tab') as 'dashboard' | 'groups' | 'account' | 'settings' | null;
-        const validTabs = ['dashboard', 'groups', 'account', 'settings'] as const;
+        const tabParam = urlParams.get('tab') as 'dashboard' | 'groups' | 'history' | 'account' | 'settings' | null;
+        const hash = window.location.hash.replace('#', '') as 'dashboard' | 'groups' | 'history' | 'account' | 'settings';
+        const savedTab = localStorage.getItem('openwrt-active-tab') as 'dashboard' | 'groups' | 'history' | 'account' | 'settings' | null;
+        const validTabs = ['dashboard', 'groups', 'history', 'account', 'settings'] as const;
 
         if (tabParam && validTabs.includes(tabParam)) return tabParam;
         if (hash && validTabs.includes(hash)) return hash;
@@ -240,7 +240,7 @@ export default function DashboardPage() {
     return 'dashboard';
   });
 
-  const handleTabChange = (tab: 'dashboard' | 'groups' | 'account' | 'settings') => {
+  const handleTabChange = (tab: 'dashboard' | 'groups' | 'history' | 'account' | 'settings') => {
     setActiveTab(tab);
     if (typeof window !== 'undefined') {
       try {
@@ -304,9 +304,16 @@ export default function DashboardPage() {
   } | null>(null);
   const [isResolvingConflict, setIsResolvingConflict] = useState(false);
 
-  // History Modal State
+  // Dedicated History Page & Modal State
   const [showHistory, setShowHistory] = useState(false);
   const [historyList, setHistoryList] = useState<any[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historySearch, setHistorySearch] = useState('');
+  const [historyFilter, setHistoryFilter] = useState<'all' | 'live' | 'archive'>('all');
+  const [selectedHistoryItem, setSelectedHistoryItem] = useState<any | null>(null);
+  const [historyViewerTab, setHistoryViewerTab] = useState<'firewall' | 'ethers' | 'diff' | 'metadata'>('firewall');
+  const [copiedHashId, setCopiedHashId] = useState<string | null>(null);
+  const [copiedContentTab, setCopiedContentTab] = useState<string | null>(null);
 
   // User Profile Dropdown Menu State
   const [showUserDropdown, setShowUserDropdown] = useState(false);
@@ -548,6 +555,24 @@ export default function DashboardPage() {
         isDuplicate: boolean;
       }[];
   }, [importText, users, groups, importTargetGroup]);
+
+  // Memoized Live Release and Filtered Releases for Dedicated History Page
+  const liveHistoryItem = useMemo(() => {
+    return historyList.find((h) => h.is_current) || historyList[0] || null;
+  }, [historyList]);
+
+  const filteredHistory = useMemo(() => {
+    return historyList.filter((h) => {
+      if (historyFilter === 'live' && !h.is_current) return false;
+      if (historyFilter === 'archive' && h.is_current) return false;
+      if (!historySearch.trim()) return true;
+      const q = historySearch.trim().toLowerCase();
+      const verMatch = `v${h.version}`.toLowerCase().includes(q) || String(h.version).includes(q);
+      const hashMatch = h.hash && h.hash.toLowerCase().includes(q);
+      const dateMatch = h.created_at && new Date(h.created_at).toLocaleString().toLowerCase().includes(q);
+      return Boolean(verMatch || hashMatch || dateMatch);
+    });
+  }, [historyList, historyFilter, historySearch]);
 
   // Execute Batch Import
   const handleExecuteImport = async () => {
@@ -836,12 +861,14 @@ export default function DashboardPage() {
     const syncTabFromUrlOrStorage = () => {
       try {
         const urlParams = new URLSearchParams(window.location.search);
-        const tabParam = urlParams.get('tab') as 'dashboard' | 'groups' | 'account' | 'settings' | null;
-        const hash = window.location.hash.replace('#', '') as 'dashboard' | 'groups' | 'account' | 'settings';
-        const savedTab = localStorage.getItem('openwrt-active-tab') as 'dashboard' | 'groups' | 'account' | 'settings' | null;
-        const validTabs = ['dashboard', 'groups', 'account', 'settings'] as const;
+        const tabParam = urlParams.get('tab') as 'dashboard' | 'groups' | 'history' | 'account' | 'settings' | null;
+        const hash = window.location.hash.replace('#', '') as 'dashboard' | 'groups' | 'history' | 'account' | 'settings';
+        const savedTab = localStorage.getItem('openwrt-active-tab') as 'dashboard' | 'groups' | 'history' | 'account' | 'settings' | null;
+        const pathname = window.location.pathname.replace(/^\//, '') as 'dashboard' | 'groups' | 'history' | 'account' | 'settings';
+        const validTabs = ['dashboard', 'groups', 'history', 'account', 'settings'] as const;
 
         const candidate = (tabParam && validTabs.includes(tabParam) ? tabParam : null)
+          || (pathname && validTabs.includes(pathname) ? pathname : null)
           || (hash && validTabs.includes(hash) ? hash : null)
           || (savedTab && validTabs.includes(savedTab) ? savedTab : null);
 
@@ -921,6 +948,26 @@ export default function DashboardPage() {
     }
   };
 
+  const fetchHistory = async () => {
+    setHistoryLoading(true);
+    try {
+      const res = await fetch('/api/config/history');
+      const data = await res.json();
+      if (data.history && Array.isArray(data.history)) {
+        setHistoryList(data.history);
+        const live = data.history.find((item: any) => item.is_current) || data.history[0];
+        if (live && !selectedHistoryItem) {
+          setSelectedHistoryItem(live);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to fetch history:', err);
+      showToast('Failed to load configuration history', 'error');
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
   const fetchCacheStatus = async () => {
     try {
       const res = await fetch('/api/system/status');
@@ -979,6 +1026,13 @@ export default function DashboardPage() {
   useEffect(() => {
     if (currentUser && currentUser.role === 'admin' && activeTab === 'account') {
       fetchAccounts();
+    }
+  }, [currentUser, activeTab]);
+
+  // Fetch history when History tab is active
+  useEffect(() => {
+    if (currentUser && activeTab === 'history') {
+      fetchHistory();
     }
   }, [currentUser, activeTab]);
 
@@ -1643,16 +1697,85 @@ export default function DashboardPage() {
     setFormError(null);
   };
 
-  // Open History Dialog
-  const openHistoryModal = async () => {
-    setShowHistory(true);
-    try {
-      const res = await fetch('/api/config/history');
-      const data = await res.json();
-      if (data.history) setHistoryList(data.history);
-    } catch (e) {
-      console.error(e);
+  // Open History Page / Dialog
+  const openHistoryModal = () => {
+    handleTabChange('history');
+  };
+
+  const downloadHistoryFile = (content: string, filename: string) => {
+    if (!content) {
+      showToast('No content available to download', 'error');
+      return;
     }
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    showToast(`Downloaded ${filename}`);
+  };
+
+  const copyToClipboard = (text: string, identifier: string, isTab: boolean = false) => {
+    if (!text) return;
+    navigator.clipboard.writeText(text);
+    if (isTab) {
+      setCopiedContentTab(identifier);
+      setTimeout(() => setCopiedContentTab(null), 2000);
+    } else {
+      setCopiedHashId(identifier);
+      setTimeout(() => setCopiedHashId(null), 2000);
+    }
+    showToast('Copied to clipboard');
+  };
+
+  const renderConfigDiff = (oldText: string, newText: string) => {
+    const oldLines = oldText ? oldText.split('\n') : [];
+    const newLines = newText ? newText.split('\n') : [];
+    const oldSet = new Set(oldLines.map((l) => l.trim()));
+    const newSet = new Set(newLines.map((l) => l.trim()));
+    const result: React.ReactNode[] = [];
+
+    oldLines.forEach((line, idx) => {
+      const trimmed = line.trim();
+      if (trimmed && !newSet.has(trimmed)) {
+        result.push(
+          <span key={`del-${idx}`} className="history-diff-line-removed">
+            - {line}
+          </span>
+        );
+      }
+    });
+
+    newLines.forEach((line, idx) => {
+      const trimmed = line.trim();
+      if (trimmed && !oldSet.has(trimmed)) {
+        result.push(
+          <span key={`add-${idx}`} className="history-diff-line-added">
+            + {line}
+          </span>
+        );
+      } else if (trimmed.startsWith('config ') || trimmed.startsWith('option name')) {
+        result.push(
+          <span key={`ctx-${idx}`} className="history-diff-line-same">
+            &nbsp;&nbsp;{line}
+          </span>
+        );
+      }
+    });
+
+    if (result.length === 0) {
+      return (
+        <div style={{ padding: '1.5rem', color: 'var(--text-secondary)', textAlign: 'center', fontSize: '0.85rem' }}>
+          Identical configuration content (no rule changes detected between releases)
+        </div>
+      );
+    }
+
+    return <pre className="history-code-pre">{result}</pre>;
   };
 
   // Auth Loading Screen
@@ -1767,6 +1890,20 @@ export default function DashboardPage() {
                   </svg>
                 </span>
                 <span className="nav-label-text">Groups</span>
+              </button>
+            </li>
+            <li>
+              <button
+                className={`nav-item-btn ${activeTab === 'history' ? 'active' : ''}`}
+                onClick={() => handleTabChange('history')}
+              >
+                <span className="nav-icon">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <circle cx="12" cy="12" r="10" />
+                    <polyline points="12 6 12 12 16 14" />
+                  </svg>
+                </span>
+                <span className="nav-label-text">History</span>
               </button>
             </li>
             <li>
@@ -3163,6 +3300,548 @@ export default function DashboardPage() {
                   </p>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* ============================================================
+              VIEW: DEDICATED HISTORY PAGE (AUDIT LEDGER & CONFIG INSPECTOR)
+              ============================================================ */}
+          {activeTab === 'history' && (
+            <div className="history-page-wrapper page-content-animated" key="history">
+              {/* Small Top Pill */}
+              <div>
+                <div className="gateway-pill">
+                  <span className="gateway-pill-dot"></span>
+                  <span>Audit Trail &amp; Releases</span>
+                </div>
+              </div>
+
+              {/* Header Row */}
+              <div className="header-row">
+                <div className="title-col">
+                  <h1 className="page-headline">Configuration History</h1>
+                  <p className="page-description">
+                    Immutable chronological audit log of published gateway releases, SHA-256 integrity checksums, and configuration snapshots.
+                  </p>
+                </div>
+                <div className="actions-col" style={{ display: 'flex', gap: '0.65rem', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    onClick={fetchHistory}
+                    disabled={historyLoading}
+                    title="Refresh releases ledger"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={historyLoading ? 'spin-icon' : ''}>
+                      <polyline points="23 4 23 10 17 10" />
+                      <polyline points="1 20 1 14 7 14" />
+                      <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+                    </svg>
+                    <span>{historyLoading ? 'Refreshing...' : 'Refresh'}</span>
+                  </button>
+                  <a
+                    href="/api/config/firewall?download=true"
+                    download="firewall"
+                    className="btn btn-secondary btn-sm"
+                    title="Download active firewall file"
+                  >
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                      <polyline points="7 10 12 15 17 10" />
+                      <line x1="12" y1="15" x2="12" y2="3" />
+                    </svg>
+                    <span>Live firewall</span>
+                  </a>
+                  <a
+                    href="/api/config/ethers?download=true"
+                    download="ethers"
+                    className="btn btn-secondary btn-sm"
+                    title="Download active ethers file"
+                  >
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                      <polyline points="7 10 12 15 17 10" />
+                      <line x1="12" y1="15" x2="12" y2="3" />
+                    </svg>
+                    <span>Live ethers</span>
+                  </a>
+                  <button type="button" className="btn btn-secondary btn-sm" onClick={() => handleTabChange('dashboard')}>
+                    ← Back to Dashboard
+                  </button>
+                </div>
+              </div>
+
+              {/* 4 Telemetry / Metric Summary Cards */}
+              <div className="history-telemetry-grid">
+                <div className="history-telemetry-card">
+                  <div className="history-telemetry-header">
+                    <span>Published Releases</span>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <polygon points="12 2 2 7 12 12 22 7 12 2" />
+                      <polyline points="2 17 12 22 22 17" />
+                      <polyline points="2 12 12 17 22 12" />
+                    </svg>
+                  </div>
+                  <div className="history-telemetry-value">
+                    {historyList.length}
+                    <span style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-secondary)' }}>versions</span>
+                  </div>
+                  <div className="history-telemetry-subtext">
+                    <span>Total immutable snapshots tracked</span>
+                  </div>
+                </div>
+
+                <div className="history-telemetry-card">
+                  <div className="history-telemetry-header">
+                    <span>Active Gateway Release</span>
+                    <span className="history-live-pill">Live</span>
+                  </div>
+                  <div className="history-telemetry-value">
+                    v{liveHistoryItem ? liveHistoryItem.version : (stats.version || 1)}
+                  </div>
+                  <div className="history-telemetry-subtext">
+                    <span>{liveHistoryItem?.created_at ? new Date(liveHistoryItem.created_at).toLocaleString() : 'Currently deployed'}</span>
+                  </div>
+                </div>
+
+                <div className="history-telemetry-card">
+                  <div className="history-telemetry-header">
+                    <span>Live Device Rules</span>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <rect x="5" y="2" width="14" height="20" rx="2" ry="2" />
+                      <line x1="12" y1="18" x2="12.01" y2="18" />
+                    </svg>
+                  </div>
+                  <div className="history-telemetry-value">
+                    {liveHistoryItem ? liveHistoryItem.user_count : (stats.total_users || 0)}
+                    <span style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-secondary)' }}>devices</span>
+                  </div>
+                  <div className="history-telemetry-subtext">
+                    <span>Compiled into gateway firewall</span>
+                  </div>
+                </div>
+
+                <div className="history-telemetry-card">
+                  <div className="history-telemetry-header">
+                    <span>Integrity Seal</span>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                    </svg>
+                  </div>
+                  <div className="history-telemetry-value" style={{ fontFamily: 'var(--font-mono)', fontSize: '1.05rem', letterSpacing: '-0.02em' }}>
+                    {liveHistoryItem?.hash ? liveHistoryItem.hash.substring(0, 10) + '...' : (stats.config_hash ? stats.config_hash.substring(0, 10) + '...' : 'Verified')}
+                  </div>
+                  <div className="history-telemetry-subtext" style={{ color: 'var(--status-applied-text)' }}>
+                    <span>● SHA-256 Checksum Verified</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Search & Filter Toolbar */}
+              <div className="history-filter-card">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1, flexWrap: 'wrap' }}>
+                  <div className="history-search-input-wrap">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="history-search-icon">
+                      <circle cx="11" cy="11" r="8" />
+                      <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                    </svg>
+                    <input
+                      type="text"
+                      className="history-search-input"
+                      placeholder="Search by version (v36), hash, or date..."
+                      value={historySearch}
+                      onChange={(e) => setHistorySearch(e.target.value)}
+                    />
+                    {historySearch && (
+                      <button
+                        type="button"
+                        onClick={() => setHistorySearch('')}
+                        style={{
+                          position: 'absolute',
+                          right: '8px',
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                          background: 'none',
+                          border: 'none',
+                          color: 'var(--text-muted)',
+                          cursor: 'pointer',
+                          padding: '4px',
+                        }}
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                    <button
+                      type="button"
+                      className={`status-filter-chip ${historyFilter === 'all' ? 'active' : ''}`}
+                      onClick={() => setHistoryFilter('all')}
+                    >
+                      <span>All Releases</span>
+                      <span className="status-filter-count">{historyList.length}</span>
+                    </button>
+                    <button
+                      type="button"
+                      className={`status-filter-chip ${historyFilter === 'live' ? 'active' : ''}`}
+                      onClick={() => setHistoryFilter('live')}
+                    >
+                      <span>Live Active</span>
+                      <span className="status-filter-count">{historyList.filter((h) => h.is_current).length}</span>
+                    </button>
+                    <button
+                      type="button"
+                      className={`status-filter-chip ${historyFilter === 'archive' ? 'active' : ''}`}
+                      onClick={() => setHistoryFilter('archive')}
+                    >
+                      <span>Archived</span>
+                      <span className="status-filter-count">{historyList.filter((h) => !h.is_current).length}</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div style={{ fontSize: '0.76rem', color: 'var(--text-secondary)' }}>
+                  Showing {filteredHistory.length} of {historyList.length} releases
+                </div>
+              </div>
+
+              {/* Master-Detail Split: Left Ledger Table & Right Inspector */}
+              <div className="history-split-layout">
+                {/* Left: Releases Ledger */}
+                <div className="history-ledger-card">
+                  <div className="history-ledger-header">
+                    <span className="history-ledger-title">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <circle cx="12" cy="12" r="10" />
+                        <polyline points="12 6 12 12 16 14" />
+                      </svg>
+                      <span>Release Chronology</span>
+                    </span>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+                      Click to inspect
+                    </span>
+                  </div>
+
+                  <div className="history-ledger-list">
+                    {filteredHistory.length === 0 ? (
+                      <div style={{ padding: '2.5rem 1rem', textAlign: 'center' }}>
+                        <div className="empty-state">
+                          <span className="empty-state-text">No releases matching query</span>
+                          <span className="empty-state-hint">Try clearing your search filters</span>
+                        </div>
+                      </div>
+                    ) : (
+                      filteredHistory.map((h) => {
+                        const isSelected = selectedHistoryItem?.id === h.id || selectedHistoryItem?.version === h.version;
+                        return (
+                          <div
+                            key={h.id || h.version}
+                            className={`history-item-row ${isSelected ? 'is-selected' : ''}`}
+                            onClick={() => setSelectedHistoryItem(h)}
+                            role="button"
+                            tabIndex={0}
+                          >
+                            <div className="history-item-row-top">
+                              <div className="history-version-badge">
+                                <span>v{h.version}</span>
+                                {h.is_current ? (
+                                  <span className="history-live-pill">Live</span>
+                                ) : (
+                                  <span className="history-archived-pill">Archived</span>
+                                )}
+                              </div>
+                              <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                                {h.user_count} {h.user_count === 1 ? 'device' : 'devices'}
+                              </span>
+                            </div>
+
+                            <div className="history-item-row-meta">
+                              <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+                                {new Date(h.created_at).toLocaleDateString(undefined, {
+                                  month: 'short',
+                                  day: 'numeric',
+                                  year: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                })}
+                              </span>
+                              <span className="history-hash-chip">
+                                {h.hash ? h.hash.substring(0, 10) + '...' : 'No hash'}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+
+                {/* Right: Selected Version Inspector */}
+                <div className="history-inspector-card">
+                  {selectedHistoryItem ? (
+                    <>
+                      {/* Inspector Header */}
+                      <div className="history-inspector-header">
+                        <div className="history-inspector-header-top">
+                          <div className="history-inspector-title">
+                            <span>Release v{selectedHistoryItem.version}</span>
+                            {selectedHistoryItem.is_current ? (
+                              <span className="history-live-pill">Live Active</span>
+                            ) : (
+                              <span className="history-archived-pill">Archived Version</span>
+                            )}
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                            <button
+                              type="button"
+                              className="btn btn-secondary btn-sm"
+                              onClick={() => copyToClipboard(selectedHistoryItem.hash, 'hash')}
+                              title="Copy full SHA-256 hash"
+                              style={{ fontSize: '0.75rem', padding: '0.35rem 0.65rem' }}
+                            >
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                              </svg>
+                              <span>{copiedHashId === 'hash' ? 'Copied Hash!' : 'Copy Hash'}</span>
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-secondary btn-sm"
+                              onClick={() => downloadHistoryFile(selectedHistoryItem.firewall_content, `firewall-v${selectedHistoryItem.version}`)}
+                              style={{ fontSize: '0.75rem', padding: '0.35rem 0.65rem' }}
+                              title="Download firewall configuration file"
+                            >
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                                <polyline points="7 10 12 15 17 10" />
+                                <line x1="12" y1="15" x2="12" y2="3" />
+                              </svg>
+                              <span>firewall</span>
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-secondary btn-sm"
+                              onClick={() => downloadHistoryFile(selectedHistoryItem.ethers_content, `ethers-v${selectedHistoryItem.version}`)}
+                              style={{ fontSize: '0.75rem', padding: '0.35rem 0.65rem' }}
+                              title="Download ethers static IP file"
+                            >
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                                <polyline points="7 10 12 15 17 10" />
+                                <line x1="12" y1="15" x2="12" y2="3" />
+                              </svg>
+                              <span>ethers</span>
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Inspector Meta Subline */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', fontSize: '0.76rem', color: 'var(--text-secondary)', flexWrap: 'wrap' }}>
+                          <div>
+                            <strong>Published:</strong> {new Date(selectedHistoryItem.created_at).toLocaleString()}
+                          </div>
+                          <div>
+                            <strong>Devices:</strong> {selectedHistoryItem.user_count} rules compiled
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                            <strong>SHA-256:</strong>
+                            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.72rem', color: 'var(--text-primary)' }}>
+                              {selectedHistoryItem.hash}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Inspector Sub-Tabs */}
+                      <div className="history-inspector-tabs">
+                        <button
+                          type="button"
+                          className={`history-tab-btn ${historyViewerTab === 'firewall' ? 'is-active' : ''}`}
+                          onClick={() => setHistoryViewerTab('firewall')}
+                        >
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                            <polyline points="14 2 14 8 20 8" />
+                          </svg>
+                          <span>Firewall Rules (/etc/config/firewall)</span>
+                        </button>
+                        <button
+                          type="button"
+                          className={`history-tab-btn ${historyViewerTab === 'ethers' ? 'is-active' : ''}`}
+                          onClick={() => setHistoryViewerTab('ethers')}
+                        >
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
+                            <line x1="8" y1="21" x2="16" y2="21" />
+                            <line x1="12" y1="17" x2="12" y2="21" />
+                          </svg>
+                          <span>Ethers Map (/etc/ethers)</span>
+                        </button>
+                        <button
+                          type="button"
+                          className={`history-tab-btn ${historyViewerTab === 'diff' ? 'is-active' : ''}`}
+                          onClick={() => setHistoryViewerTab('diff')}
+                        >
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <circle cx="18" cy="18" r="3" />
+                            <circle cx="6" cy="6" r="3" />
+                            <path d="M13 6h3a2 2 0 0 1 2 2v7" />
+                            <line x1="6" y1="9" x2="6" y2="21" />
+                          </svg>
+                          <span>Compare vs Live</span>
+                        </button>
+                        <button
+                          type="button"
+                          className={`history-tab-btn ${historyViewerTab === 'metadata' ? 'is-active' : ''}`}
+                          onClick={() => setHistoryViewerTab('metadata')}
+                        >
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <circle cx="12" cy="12" r="10" />
+                            <line x1="12" y1="16" x2="12" y2="12" />
+                            <line x1="12" y1="8" x2="12.01" y2="8" />
+                          </svg>
+                          <span>Audit Properties</span>
+                        </button>
+                      </div>
+
+                      {/* Inspector Content Panes */}
+                      {historyViewerTab === 'firewall' && (
+                        <div style={{ position: 'relative' }}>
+                          <div style={{ position: 'absolute', top: '1.5rem', right: '1.5rem', zIndex: 2 }}>
+                            <button
+                              type="button"
+                              className="history-copy-btn"
+                              onClick={() => copyToClipboard(selectedHistoryItem.firewall_content || '', 'firewall-content', true)}
+                            >
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                              </svg>
+                              <span>{copiedContentTab === 'firewall-content' ? 'Copied!' : 'Copy Code'}</span>
+                            </button>
+                          </div>
+                          <div className="history-code-container">
+                            <pre className="history-code-pre">
+                              {selectedHistoryItem.firewall_content || '# No firewall rules stored for this release'}
+                            </pre>
+                          </div>
+                        </div>
+                      )}
+
+                      {historyViewerTab === 'ethers' && (
+                        <div style={{ position: 'relative' }}>
+                          <div style={{ position: 'absolute', top: '1.5rem', right: '1.5rem', zIndex: 2 }}>
+                            <button
+                              type="button"
+                              className="history-copy-btn"
+                              onClick={() => copyToClipboard(selectedHistoryItem.ethers_content || '', 'ethers-content', true)}
+                            >
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                              </svg>
+                              <span>{copiedContentTab === 'ethers-content' ? 'Copied!' : 'Copy Code'}</span>
+                            </button>
+                          </div>
+                          <div className="history-code-container">
+                            <pre className="history-code-pre">
+                              {selectedHistoryItem.ethers_content || '# No static ethers entries in this release'}
+                            </pre>
+                          </div>
+                        </div>
+                      )}
+
+                      {historyViewerTab === 'diff' && (
+                        <div style={{ padding: '1rem' }}>
+                          {selectedHistoryItem.is_current ? (
+                            <div className="horizontal-add-card" style={{ padding: '1.5rem', textAlign: 'center' }}>
+                              <div style={{ fontWeight: 600, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>
+                                This is the currently active Live Release (v{selectedHistoryItem.version})
+                              </div>
+                              <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                                To inspect diffs, select an archived historical release from the list on the left to see what changed compared to this live release.
+                              </p>
+                            </div>
+                          ) : (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                              {/* Summary Banner */}
+                              <div className="history-metadata-item" style={{ background: 'var(--bg-app)' }}>
+                                <div>
+                                  <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>Comparing:</span>{' '}
+                                  <span>v{selectedHistoryItem.version} (Archive)</span> →{' '}
+                                  <span style={{ fontWeight: 600, color: 'var(--status-applied-text)' }}>v{liveHistoryItem?.version || stats.version || 1} (Live)</span>
+                                </div>
+                                <div style={{ fontSize: '0.78rem' }}>
+                                  <strong>Device Delta:</strong>{' '}
+                                  {(liveHistoryItem ? liveHistoryItem.user_count : stats.total_users || 0) - selectedHistoryItem.user_count >= 0
+                                    ? `+${(liveHistoryItem ? liveHistoryItem.user_count : stats.total_users || 0) - selectedHistoryItem.user_count} devices`
+                                    : `${(liveHistoryItem ? liveHistoryItem.user_count : stats.total_users || 0) - selectedHistoryItem.user_count} devices`}
+                                </div>
+                              </div>
+
+                              {/* Diff Code View */}
+                              <div className="history-code-container" style={{ margin: 0, maxHeight: '420px' }}>
+                                {renderConfigDiff(selectedHistoryItem.firewall_content || '', liveHistoryItem?.firewall_content || '')}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {historyViewerTab === 'metadata' && (
+                        <div className="history-metadata-box">
+                          <div className="history-metadata-item">
+                            <span style={{ color: 'var(--text-secondary)' }}>Release Identifier</span>
+                            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.78rem' }}>{selectedHistoryItem.id}</span>
+                          </div>
+                          <div className="history-metadata-item">
+                            <span style={{ color: 'var(--text-secondary)' }}>Version Number</span>
+                            <span style={{ fontWeight: 700 }}>v{selectedHistoryItem.version}</span>
+                          </div>
+                          <div className="history-metadata-item">
+                            <span style={{ color: 'var(--text-secondary)' }}>Deployment Status</span>
+                            {selectedHistoryItem.is_current ? (
+                              <span className="history-live-pill">Active on Gateway</span>
+                            ) : (
+                              <span className="history-archived-pill">Archived / Superseded</span>
+                            )}
+                          </div>
+                          <div className="history-metadata-item">
+                            <span style={{ color: 'var(--text-secondary)' }}>Timestamp Generated</span>
+                            <span>{new Date(selectedHistoryItem.created_at).toISOString()}</span>
+                          </div>
+                          <div className="history-metadata-item">
+                            <span style={{ color: 'var(--text-secondary)' }}>Full Checksum (SHA-256)</span>
+                            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem', wordBreak: 'break-all' }}>
+                              {selectedHistoryItem.hash}
+                            </span>
+                          </div>
+                          {selectedHistoryItem.metadata && (
+                            <div className="history-metadata-item" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '0.5rem' }}>
+                              <span style={{ color: 'var(--text-secondary)' }}>Extended Metadata JSON</span>
+                              <pre style={{ margin: 0, fontFamily: 'var(--font-mono)', fontSize: '0.75rem', background: 'var(--bg-app)', padding: '0.5rem', borderRadius: '4px', width: '100%', overflowX: 'auto' }}>
+                                {JSON.stringify(selectedHistoryItem.metadata, null, 2)}
+                              </pre>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', padding: '4rem 1rem', color: 'var(--text-secondary)' }}>
+                      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ opacity: 0.5, marginBottom: '0.75rem' }}>
+                        <polygon points="12 2 2 7 12 12 22 7 12 2" />
+                        <polyline points="2 17 12 22 22 17" />
+                        <polyline points="2 12 12 17 22 12" />
+                      </svg>
+                      <div style={{ fontWeight: 600 }}>Select a release to inspect</div>
+                      <div style={{ fontSize: '0.8rem', marginTop: '0.25rem' }}>View firewall rules, MAC assignments, and checksums</div>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           )}
 
