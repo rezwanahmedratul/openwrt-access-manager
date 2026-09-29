@@ -3,7 +3,7 @@
 # ==============================================================================
 
 # Stage 1: Build
-FROM node:20-slim AS builder
+FROM node:22-slim AS builder
 WORKDIR /app
 
 # Cache dependencies
@@ -26,7 +26,7 @@ ENV NODE_ENV=production
 RUN NODE_OPTIONS="--max-old-space-size=2048" npm run build
 
 # Stage 2: Minimal Production Runtime
-FROM node:20-slim AS runner
+FROM node:22-slim AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
