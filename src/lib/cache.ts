@@ -29,8 +29,11 @@ function getRedisClient(): Redis | null {
   }
 
   const redisUrl = process.env.REDIS_URL;
-  // If REDIS_URL is not set (e.g. Vercel without external Redis), gracefully use fast in-memory cache
-  if (!redisUrl) {
+  // If REDIS_URL is not set or points to localhost on Vercel, gracefully use fast in-memory cache
+  const isVercel = Boolean(process.env.VERCEL);
+  const isLocalRedis = redisUrl ? (redisUrl.includes('127.0.0.1') || redisUrl.includes('localhost') || redisUrl.includes('::1')) : false;
+
+  if (!redisUrl || (isVercel && isLocalRedis)) {
     isRedisAvailable = false;
     return null;
   }
