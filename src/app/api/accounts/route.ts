@@ -201,3 +201,106 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ error: err.message || 'Failed to delete account' }, { status: 500 });
   }
 }
+
+export async function PATCH(request: Request) {
+  const session = getSessionFromRequest(request);
+  if (!session || session.role !== 'admin') {
+    return NextResponse.json({ error: 'Unauthorized: Only administrators can change account passwords' }, { status: 403 });
+  }
+
+  try {
+    const { id, username, password } = await request.json();
+
+    if ((!id && !username) || !password) {
+      return NextResponse.json({ error: 'Account identifier and new password are required' }, { status: 400 });
+    }
+
+    const cleanPassword = String(password).trim();
+    if (cleanPassword.length < 4) {
+      return NextResponse.json({ error: 'Password must be at least 4 characters' }, { status: 400 });
+    }
+
+    const isSupabaseConfigured = Boolean(
+      process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_URL.startsWith('http')
+    );
+
+    if (isSupabaseConfigured) {
+      try {
+        const supabase = getServiceSupabase();
+        
+        let query = supabase.from('accounts').select('id, username, role');
+        if (id) {
+          query = query.eq('id', id);
+        } else if (username) {
+          query = query.ilike('username', String(username).trim().toLowerCase());
+        }
+
+        const { data: existing, error: findError } = await query.maybeSingle();
+
+        if (findError || !existing) {
+          return NextResponse.json({ error: 'Account not found' }, { status: 404 });
+        }
+
+        const { error: updateError } = await supabase
+          .from('accounts')
+          .update({
+            password_hash: cleanPassword,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', existing.id);
+
+        if (updateError) throw updateError;
+
+        // Keep mock store in sync with database change
+        const state = getMockState();
+        const mockIdx = state.mockAccounts.findIndex(
+          (a) => a.id === existing.id || a.username.toLowerCase() === existing.username.toLowerCase()
+        );
+        if (mockIdx !== -1) {
+          const updated = [...state.mockAccounts];
+          updated[mockIdx] = {
+            ...updated[mockIdx],
+            password_hash: cleanPassword,
+            updated_at: new Date().toISOString(),
+          };
+          state.setMockAccounts(updated);
+        }
+
+        await cacheDelPrefix('cache:accounts:');
+        return NextResponse.json({
+          success: true,
+          message: `Password updated successfully for ${existing.username}`,
+        });
+      } catch (e: any) {
+        console.error('Supabase update password error, falling back to mock:', e);
+      }
+    }
+
+    const state = getMockState();
+    const accountIndex = state.mockAccounts.findIndex(
+      (a) => (id && a.id === id) || (username && a.username.toLowerCase() === String(username).trim().toLowerCase())
+    );
+
+    if (accountIndex === -1) {
+      return NextResponse.json({ error: 'Account not found' }, { status: 404 });
+    }
+
+    const updatedAccounts = [...state.mockAccounts];
+    const targetAccount = updatedAccounts[accountIndex];
+    updatedAccounts[accountIndex] = {
+      ...targetAccount,
+      password_hash: cleanPassword,
+      updated_at: new Date().toISOString(),
+    };
+    state.setMockAccounts(updatedAccounts);
+    await cacheDelPrefix('cache:accounts:');
+
+    return NextResponse.json({
+      success: true,
+      message: `Password updated successfully for ${targetAccount.username}`,
+    });
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message || 'Failed to update password' }, { status: 500 });
+  }
+}
+

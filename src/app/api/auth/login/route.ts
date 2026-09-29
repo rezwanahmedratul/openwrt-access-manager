@@ -20,29 +20,42 @@ export async function POST(request: Request) {
     );
 
     let authenticatedUser: SessionUser | null = null;
+    let checkedFromDatabase = false;
 
     if (isSupabaseConfigured) {
       try {
         const supabase = getServiceSupabase();
-        const { data: account } = await supabase
+        const { data: account, error } = await supabase
           .from('accounts')
           .select('id, username, password_hash, role')
           .ilike('username', cleanUsername)
           .maybeSingle();
 
-        if (account && account.password_hash === cleanPassword) {
-          authenticatedUser = {
-            id: account.id,
-            username: account.username,
-            role: account.role,
-          };
+        if (!error) {
+          checkedFromDatabase = true;
+          if (account) {
+            if (account.password_hash === cleanPassword) {
+              authenticatedUser = {
+                id: account.id,
+                username: account.username,
+                role: account.role,
+              };
+            } else {
+              // Password does not match database record
+              return NextResponse.json({ error: 'Invalid username or password' }, { status: 401 });
+            }
+          } else {
+            // Account does not exist in database
+            return NextResponse.json({ error: 'Invalid username or password' }, { status: 401 });
+          }
         }
       } catch (e) {
         console.error('Supabase auth error, falling back to mock:', e);
       }
     }
 
-    if (!authenticatedUser) {
+    // Only fallback to mock accounts if database was not configured or threw a network error
+    if (!checkedFromDatabase && !authenticatedUser) {
       const state = getMockState();
       const account = state.mockAccounts.find(
         (a) => a.username.toLowerCase() === cleanUsername && a.password_hash === cleanPassword

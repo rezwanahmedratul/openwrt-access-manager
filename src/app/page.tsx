@@ -91,8 +91,8 @@ export default function DashboardPage() {
   // Authentication & Session State
   const [currentUser, setCurrentUser] = useState<SessionUser | null>(null);
   const [authChecking, setAuthChecking] = useState(true);
-  const [loginUsername, setLoginUsername] = useState('admin');
-  const [loginPassword, setLoginPassword] = useState('admin123');
+  const [loginUsername, setLoginUsername] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
   const [loginError, setLoginError] = useState<string | null>(null);
   const [loginLoading, setLoginLoading] = useState(false);
 
@@ -102,6 +102,14 @@ export default function DashboardPage() {
   const [newSubadminPassword, setNewSubadminPassword] = useState('');
   const [subadminError, setSubadminError] = useState<string | null>(null);
   const [subadminLoading, setSubadminLoading] = useState(false);
+
+  // Change Password Modal State (Admin only)
+  const [passwordModalAccount, setPasswordModalAccount] = useState<{ id: string; username: string; role: string } | null>(null);
+  const [newPasswordVal, setNewPasswordVal] = useState('');
+  const [confirmPasswordVal, setConfirmPasswordVal] = useState('');
+  const [passwordModalError, setPasswordModalError] = useState<string | null>(null);
+  const [passwordModalLoading, setPasswordModalLoading] = useState(false);
+  const [showPasswordText, setShowPasswordText] = useState(false);
 
   // Main Data State
   const [users, setUsers] = useState<UserViewModel[]>([]);
@@ -984,6 +992,68 @@ export default function DashboardPage() {
     }
   };
 
+  // Change Password Handlers (Admin only)
+  const openPasswordModal = (account: { id: string; username: string; role: string }) => {
+    setPasswordModalAccount(account);
+    setNewPasswordVal('');
+    setConfirmPasswordVal('');
+    setPasswordModalError(null);
+    setShowPasswordText(false);
+  };
+
+  const closePasswordModal = () => {
+    setPasswordModalAccount(null);
+    setNewPasswordVal('');
+    setConfirmPasswordVal('');
+    setPasswordModalError(null);
+  };
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!passwordModalAccount) return;
+
+    if (!newPasswordVal) {
+      setPasswordModalError('Please enter a new password');
+      return;
+    }
+    if (newPasswordVal.length < 4) {
+      setPasswordModalError('Password must be at least 4 characters long');
+      return;
+    }
+    if (newPasswordVal !== confirmPasswordVal) {
+      setPasswordModalError('Passwords do not match');
+      return;
+    }
+
+    setPasswordModalLoading(true);
+    setPasswordModalError(null);
+
+    try {
+      const res = await fetch('/api/accounts', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: passwordModalAccount.id,
+          username: passwordModalAccount.username,
+          password: newPasswordVal,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setPasswordModalError(data.error || 'Failed to update password');
+        return;
+      }
+
+      showToast(`Password updated successfully for ${passwordModalAccount.username}`);
+      closePasswordModal();
+    } catch (err: any) {
+      setPasswordModalError(err.message || 'Network error updating password');
+    } finally {
+      setPasswordModalLoading(false);
+    }
+  };
+
   // Group Management: Create Group
   const handleCreateGroup = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1194,33 +1264,6 @@ export default function DashboardPage() {
               {loginLoading ? 'Signing in...' : 'Sign In to Gateway'}
             </button>
           </form>
-
-          {/* Quick Credential Test Buttons */}
-          <div className="auth-quick-creds">
-            <span>Test Role Credentials:</span>
-            <div className="auth-creds-pills">
-              <button
-                type="button"
-                className="auth-role-pill-btn"
-                onClick={() => {
-                  setLoginUsername('admin');
-                  setLoginPassword('admin123');
-                }}
-              >
-                <strong>Admin</strong> (admin / admin123)
-              </button>
-              <button
-                type="button"
-                className="auth-role-pill-btn"
-                onClick={() => {
-                  setLoginUsername('subadmin');
-                  setLoginPassword('subadmin123');
-                }}
-              >
-                <strong>Subadmin</strong> (subadmin / subadmin123)
-              </button>
-            </div>
-          </div>
         </div>
       </div>
     );
@@ -1451,6 +1494,27 @@ export default function DashboardPage() {
                       </svg>
                       <span>Gateway Settings</span>
                     </button>
+
+                    {currentUser?.role === 'admin' && (
+                      <button
+                        type="button"
+                        className="user-dropdown-item"
+                        onClick={() => {
+                          setShowUserDropdown(false);
+                          openPasswordModal({
+                            id: currentUser.id,
+                            username: currentUser.username,
+                            role: currentUser.role,
+                          });
+                        }}
+                      >
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                          <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                        </svg>
+                        <span>Change Password</span>
+                      </button>
+                    )}
 
                     <div className="user-dropdown-divider" />
 
@@ -2214,7 +2278,7 @@ export default function DashboardPage() {
                           <th>USERNAME</th>
                           <th>ROLE</th>
                           <th>CREATED AT</th>
-                          <th style={{ textAlign: 'right', width: '130px' }}>ACTIONS</th>
+                          <th style={{ textAlign: 'right', minWidth: '180px' }}>ACTIONS</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -2232,17 +2296,28 @@ export default function DashboardPage() {
                               </span>
                             </td>
                             <td style={{ textAlign: 'right' }}>
-                              {acc.role !== 'admin' ? (
+                              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.85rem', justifyContent: 'flex-end' }}>
                                 <button
+                                  type="button"
                                   className="btn-text-action"
-                                  onClick={() => handleDeleteSubadmin(acc.id, acc.username)}
-                                  style={{ color: '#ef4444' }}
+                                  onClick={() => openPasswordModal(acc)}
+                                  style={{ color: 'var(--brand-primary, #6366f1)', fontWeight: 500 }}
                                 >
-                                  Delete
+                                  Change Password
                                 </button>
-                              ) : (
-                                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Primary Admin</span>
-                              )}
+                                {acc.role !== 'admin' ? (
+                                  <button
+                                    type="button"
+                                    className="btn-text-action"
+                                    onClick={() => handleDeleteSubadmin(acc.id, acc.username)}
+                                    style={{ color: '#ef4444' }}
+                                  >
+                                    Delete
+                                  </button>
+                                ) : (
+                                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>(Primary)</span>
+                                )}
+                              </div>
                             </td>
                           </tr>
                         ))}
@@ -3372,6 +3447,115 @@ export default function DashboardPage() {
                 {isResolvingConflict ? 'Resolving...' : 'Force Add to No Internet'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Change Password Modal (Admin Only) */}
+      {passwordModalAccount && currentUser?.role === 'admin' && (
+        <div className="modal-backdrop">
+          <div className="modal-card" style={{ maxWidth: '440px' }}>
+            <div className="modal-header-row">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                <div style={{
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '8px',
+                  backgroundColor: 'rgba(99, 102, 241, 0.12)',
+                  color: 'var(--brand-primary, #6366f1)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="modal-headline" style={{ margin: 0 }}>Change Password</h3>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                    Updating password for <strong style={{ color: 'var(--text-primary)' }}>{passwordModalAccount.username}</strong> ({passwordModalAccount.role})
+                  </div>
+                </div>
+              </div>
+              <button onClick={closePasswordModal} className="modal-close-icon" aria-label="Close">
+                <IconClose size={13} />
+              </button>
+            </div>
+
+            <form onSubmit={handleChangePassword}>
+              {passwordModalError && (
+                <div className="form-alert-msg" style={{ marginBottom: '1rem' }}>
+                  {passwordModalError}
+                </div>
+              )}
+
+              <div className="form-group-block">
+                <label className="form-label-title">New Password</label>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type={showPasswordText ? "text" : "password"}
+                    className="form-input-element"
+                    placeholder="Enter new password (min. 4 characters)"
+                    value={newPasswordVal}
+                    onChange={(e) => setNewPasswordVal(e.target.value)}
+                    required
+                    minLength={4}
+                    autoFocus
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPasswordText(!showPasswordText)}
+                    style={{
+                      position: 'absolute',
+                      right: '10px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'none',
+                      border: 'none',
+                      color: 'var(--text-muted)',
+                      cursor: 'pointer',
+                      fontSize: '0.75rem',
+                      padding: '4px',
+                    }}
+                  >
+                    {showPasswordText ? 'Hide' : 'Show'}
+                  </button>
+                </div>
+              </div>
+
+              <div className="form-group-block">
+                <label className="form-label-title">Confirm New Password</label>
+                <input
+                  type={showPasswordText ? "text" : "password"}
+                  className="form-input-element"
+                  placeholder="Re-enter new password"
+                  value={confirmPasswordVal}
+                  onChange={(e) => setConfirmPasswordVal(e.target.value)}
+                  required
+                  minLength={4}
+                />
+              </div>
+
+              <div className="modal-footer-row" style={{ marginTop: '1.5rem', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={closePasswordModal}
+                  disabled={passwordModalLoading}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={passwordModalLoading}
+                >
+                  {passwordModalLoading ? 'Updating...' : 'Update Password'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
