@@ -213,6 +213,20 @@ export default function DashboardPage() {
     return result;
   }, [users, search, statusFilter, selectedGroup, sortColumn, sortDirection]);
 
+  // Dashboard Pagination State (10 users at a time on dashboard)
+  const [dashboardPage, setDashboardPage] = useState(1);
+  const DASHBOARD_PAGE_SIZE = 10;
+  const dashboardTotalPages = Math.max(1, Math.ceil(displayedUsers.length / DASHBOARD_PAGE_SIZE));
+  const paginatedDashboardUsers = useMemo(() => {
+    const start = (dashboardPage - 1) * DASHBOARD_PAGE_SIZE;
+    return displayedUsers.slice(start, start + DASHBOARD_PAGE_SIZE);
+  }, [displayedUsers, dashboardPage]);
+
+  // Reset pagination to first page when search or filters change
+  useEffect(() => {
+    setDashboardPage(1);
+  }, [search, statusFilter, selectedGroup]);
+
   // Redis / In-memory Cache Diagnostics state
   const [cacheInfo, setCacheInfo] = useState<{ engine: string; connected: boolean; keysCount: number; pingMs: number } | null>(null);
   const [isPurgingCache, setIsPurgingCache] = useState(false);
@@ -220,17 +234,19 @@ export default function DashboardPage() {
   // Theme Management (Light / Dark Mode)
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
 
-  // Navigation state: 'dashboard' | 'groups' | 'history' | 'account' | 'settings' with URL & localStorage persistence
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'groups' | 'history' | 'account' | 'settings'>(() => {
+  // Navigation state: 'dashboard' | 'users' | 'groups' | 'history' | 'account' | 'settings' with URL & localStorage persistence
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'groups' | 'history' | 'account' | 'settings'>(() => {
     if (typeof window !== 'undefined') {
       try {
         const urlParams = new URLSearchParams(window.location.search);
-        const tabParam = urlParams.get('tab') as 'dashboard' | 'groups' | 'history' | 'account' | 'settings' | null;
-        const hash = window.location.hash.replace('#', '') as 'dashboard' | 'groups' | 'history' | 'account' | 'settings';
-        const savedTab = localStorage.getItem('openwrt-active-tab') as 'dashboard' | 'groups' | 'history' | 'account' | 'settings' | null;
-        const validTabs = ['dashboard', 'groups', 'history', 'account', 'settings'] as const;
+        const tabParam = urlParams.get('tab') as 'dashboard' | 'users' | 'groups' | 'history' | 'account' | 'settings' | null;
+        const hash = window.location.hash.replace('#', '') as 'dashboard' | 'users' | 'groups' | 'history' | 'account' | 'settings';
+        const savedTab = localStorage.getItem('openwrt-active-tab') as 'dashboard' | 'users' | 'groups' | 'history' | 'account' | 'settings' | null;
+        const pathname = window.location.pathname.replace(/^\//, '') as 'dashboard' | 'users' | 'groups' | 'history' | 'account' | 'settings';
+        const validTabs = ['dashboard', 'users', 'groups', 'history', 'account', 'settings'] as const;
 
         if (tabParam && validTabs.includes(tabParam)) return tabParam;
+        if (pathname && validTabs.includes(pathname)) return pathname;
         if (hash && validTabs.includes(hash)) return hash;
         if (savedTab && validTabs.includes(savedTab)) return savedTab;
       } catch {
@@ -240,7 +256,7 @@ export default function DashboardPage() {
     return 'dashboard';
   });
 
-  const handleTabChange = (tab: 'dashboard' | 'groups' | 'history' | 'account' | 'settings') => {
+  const handleTabChange = (tab: 'dashboard' | 'users' | 'groups' | 'history' | 'account' | 'settings') => {
     setActiveTab(tab);
     if (typeof window !== 'undefined') {
       try {
@@ -861,11 +877,11 @@ export default function DashboardPage() {
     const syncTabFromUrlOrStorage = () => {
       try {
         const urlParams = new URLSearchParams(window.location.search);
-        const tabParam = urlParams.get('tab') as 'dashboard' | 'groups' | 'history' | 'account' | 'settings' | null;
-        const hash = window.location.hash.replace('#', '') as 'dashboard' | 'groups' | 'history' | 'account' | 'settings';
-        const savedTab = localStorage.getItem('openwrt-active-tab') as 'dashboard' | 'groups' | 'history' | 'account' | 'settings' | null;
-        const pathname = window.location.pathname.replace(/^\//, '') as 'dashboard' | 'groups' | 'history' | 'account' | 'settings';
-        const validTabs = ['dashboard', 'groups', 'history', 'account', 'settings'] as const;
+        const tabParam = urlParams.get('tab') as 'dashboard' | 'users' | 'groups' | 'history' | 'account' | 'settings' | null;
+        const hash = window.location.hash.replace('#', '') as 'dashboard' | 'users' | 'groups' | 'history' | 'account' | 'settings';
+        const savedTab = localStorage.getItem('openwrt-active-tab') as 'dashboard' | 'users' | 'groups' | 'history' | 'account' | 'settings' | null;
+        const pathname = window.location.pathname.replace(/^\//, '') as 'dashboard' | 'users' | 'groups' | 'history' | 'account' | 'settings';
+        const validTabs = ['dashboard', 'users', 'groups', 'history', 'account', 'settings'] as const;
 
         const candidate = (tabParam && validTabs.includes(tabParam) ? tabParam : null)
           || (pathname && validTabs.includes(pathname) ? pathname : null)
@@ -1778,6 +1794,145 @@ export default function DashboardPage() {
     return <pre className="history-code-pre">{result}</pre>;
   };
 
+  const renderUserRow = (u: UserViewModel) => {
+    const isNoInternetUser = u.groups?.some((g) => g.is_no_internet);
+    const isProtectedFromSubadmin = currentUser?.role === 'subadmin' && u.groups?.some((g) => g.is_protected);
+    const isDeleted = u.status === 'deleted';
+    const isSelectable = !isDeleted && !isProtectedFromSubadmin;
+    return (
+      <tr key={u.id} className={`user-row-card ${isSelectionMode ? 'has-selection-mode' : ''}`} style={{ opacity: isDeleted ? 0.4 : 1 }}>
+        {isSelectionMode && (
+          <td className="cell-checkbox">
+            <input
+              type="checkbox"
+              disabled={!isSelectable}
+              checked={selectedUserIds.has(u.id)}
+              onChange={() => handleToggleSelectUser(u.id)}
+              style={{
+                cursor: isSelectable ? 'pointer' : 'not-allowed',
+                width: '15px',
+                height: '15px',
+                accentColor: 'var(--text-primary)',
+                opacity: isSelectable ? 1 : 0.35,
+              }}
+              title={isProtectedFromSubadmin ? 'Protected user (Admin only)' : isDeleted ? 'Already marked for deletion' : undefined}
+            />
+          </td>
+        )}
+        <td className="cell-status">
+          {isNoInternetUser ? (
+            <span className="badge-no-internet" title="Internet access blocked by firewall rule">
+              <IconBan size={12} style={{ marginRight: '0.35rem' }} />
+              <span>No Internet</span>
+            </span>
+          ) : (
+            <span className={`status-badge-capsule status-badge-${u.status}`}>
+              <span className="status-green-dot"></span>
+              <span>{u.status}</span>
+            </span>
+          )}
+        </td>
+        <td className="cell-name">
+          <span className="user-name-cell">{u.name}</span>
+        </td>
+        <td className="cell-mac">
+          <div style={{ display: 'inline-flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.35rem' }}>
+            <span
+              className="mac-address-pill"
+              onClick={() => handleCopyMac(u.mac_address)}
+              style={{ cursor: 'pointer' }}
+              title={copiedMac === u.mac_address ? 'Copied!' : 'Click to copy'}
+            >
+              {copiedMac === u.mac_address ? (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
+                  <IconCheck size={11} style={{ color: 'var(--status-applied-dot)' }} />
+                  <span>Copied</span>
+                </span>
+              ) : (
+                u.mac_address
+              )}
+            </span>
+            {(() => {
+              const vendor = getMacVendor(u.mac_address);
+              return vendor ? (
+                <span className="mac-vendor-pill" title={`Manufacturer: ${vendor}`}>
+                  {vendor}
+                </span>
+              ) : null;
+            })()}
+          </div>
+        </td>
+        <td className="cell-groups">
+          <div className="group-tags-wrap">
+            {u.groups && u.groups.length > 0 ? (
+              u.groups.map((g) => (
+                <span
+                  key={g.id}
+                  className="group-tag-pill"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedGroup(g.id);
+                  }}
+                  style={{
+                    cursor: 'pointer',
+                    ...(g.is_no_internet
+                      ? { borderColor: 'rgba(220, 38, 38, 0.4)', background: 'rgba(220, 38, 38, 0.08)' }
+                      : undefined),
+                  }}
+                  title={`Click to filter by "${g.name}"`}
+                >
+                  {g.is_no_internet && (
+                    <IconBan size={11} style={{ marginRight: '0.25rem' }} />
+                  )}
+                  {g.name}
+                  {g.is_protected && (
+                    <span style={{ marginLeft: '0.3rem', display: 'inline-flex', alignItems: 'center' }} title="Protected Group">
+                      <IconLock size={11} style={{ color: 'var(--text-secondary)' }} />
+                    </span>
+                  )}
+                </span>
+              ))
+            ) : (
+              <span className="group-tag-pill">Default</span>
+            )}
+          </div>
+        </td>
+        <td className="cell-actions">
+          {u.status !== 'deleted' ? (
+            <div className="table-actions-cell">
+              {u.groups?.some((g) => g.is_protected) && currentUser?.role === 'subadmin' ? (
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }} title="User is assigned to a protected group. Only administrators can edit or delete this user.">
+                  <IconLock size={11} />
+                  <span>Protected (Admin Only)</span>
+                </span>
+              ) : (
+                <>
+                  <button
+                    className="btn-text-action"
+                    onClick={() => openEditModal(u)}
+                  >
+                    Edit
+                  </button>
+                  <button
+                    className="btn-text-action"
+                    onClick={() => handleDeleteUser(u)}
+                  >
+                    Delete
+                  </button>
+                </>
+              )}
+            </div>
+          ) : (
+            <div style={{ textAlign: 'right', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+              Pending Delete
+            </div>
+          )}
+        </td>
+      </tr>
+    );
+  };
+
+
   // Auth Loading Screen
   if (authChecking) {
     return (
@@ -1874,6 +2029,22 @@ export default function DashboardPage() {
                   </svg>
                 </span>
                 <span className="nav-label-text">Dashboard</span>
+              </button>
+            </li>
+            <li>
+              <button
+                className={`nav-item-btn ${activeTab === 'users' ? 'active' : ''}`}
+                onClick={() => handleTabChange('users')}
+              >
+                <span className="nav-icon">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                    <circle cx="9" cy="7" r="4" />
+                    <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                  </svg>
+                </span>
+                <span className="nav-label-text">All Users</span>
               </button>
             </li>
             <li>
@@ -2590,6 +2761,20 @@ export default function DashboardPage() {
 
                   <button
                     type="button"
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => handleTabChange('users')}
+                    style={{ fontSize: '0.75rem', padding: '0.3rem 0.65rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+                    title="Open dedicated page with all users"
+                  >
+                    <span>See All ({users.length})</span>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <line x1="5" y1="12" x2="19" y2="12" />
+                      <polyline points="12 5 19 12 12 19" />
+                    </svg>
+                  </button>
+
+                  <button
+                    type="button"
                     className="btn btn-ghost btn-sm"
                     onClick={handleExportCSV}
                     style={{ fontSize: '0.75rem', padding: '0.3rem 0.65rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
@@ -2748,146 +2933,481 @@ export default function DashboardPage() {
                         </td>
                       </tr>
                     ) : (
-                      displayedUsers.map((u) => {
-                        const isNoInternetUser = u.groups?.some((g) => g.is_no_internet);
-                        const isProtectedFromSubadmin = currentUser?.role === 'subadmin' && u.groups?.some((g) => g.is_protected);
-                        const isDeleted = u.status === 'deleted';
-                        const isSelectable = !isDeleted && !isProtectedFromSubadmin;
-                        return (
-                          <tr key={u.id} className={`user-row-card ${isSelectionMode ? 'has-selection-mode' : ''}`} style={{ opacity: isDeleted ? 0.4 : 1 }}>
-                            {isSelectionMode && (
-                              <td className="cell-checkbox">
-                                <input
-                                  type="checkbox"
-                                  disabled={!isSelectable}
-                                  checked={selectedUserIds.has(u.id)}
-                                  onChange={() => handleToggleSelectUser(u.id)}
-                                  style={{
-                                    cursor: isSelectable ? 'pointer' : 'not-allowed',
-                                    width: '15px',
-                                    height: '15px',
-                                    accentColor: 'var(--text-primary)',
-                                    opacity: isSelectable ? 1 : 0.35,
-                                  }}
-                                  title={isProtectedFromSubadmin ? 'Protected user (Admin only)' : isDeleted ? 'Already marked for deletion' : undefined}
-                                />
-                              </td>
-                            )}
-                            <td className="cell-status">
-                              {isNoInternetUser ? (
-                                <span className="badge-no-internet" title="Internet access blocked by firewall rule">
-                                  <IconBan size={12} style={{ marginRight: '0.35rem' }} />
-                                  <span>No Internet</span>
-                                </span>
-                              ) : (
-                                <span className={`status-badge-capsule status-badge-${u.status}`}>
-                                  <span className="status-green-dot"></span>
-                                  <span>{u.status}</span>
-                                </span>
-                              )}
-                            </td>
-                            <td className="cell-name">
-                              <span className="user-name-cell">{u.name}</span>
-                            </td>
-                            <td className="cell-mac">
-                              <div style={{ display: 'inline-flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.35rem' }}>
-                                <span
-                                  className="mac-address-pill"
-                                  onClick={() => handleCopyMac(u.mac_address)}
-                                  style={{ cursor: 'pointer' }}
-                                  title={copiedMac === u.mac_address ? 'Copied!' : 'Click to copy'}
-                                >
-                                  {copiedMac === u.mac_address ? (
-                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
-                                      <IconCheck size={11} style={{ color: 'var(--status-applied-dot)' }} />
-                                      <span>Copied</span>
-                                    </span>
-                                  ) : (
-                                    u.mac_address
-                                  )}
-                                </span>
-                                {(() => {
-                                  const vendor = getMacVendor(u.mac_address);
-                                  return vendor ? (
-                                    <span className="mac-vendor-pill" title={`Manufacturer: ${vendor}`}>
-                                      {vendor}
-                                    </span>
-                                  ) : null;
-                                })()}
-                              </div>
-                            </td>
-                            <td className="cell-groups">
-                              <div className="group-tags-wrap">
-                                {u.groups && u.groups.length > 0 ? (
-                                  u.groups.map((g) => (
-                                    <span
-                                      key={g.id}
-                                      className="group-tag-pill"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setSelectedGroup(g.id);
-                                      }}
-                                      style={{
-                                        cursor: 'pointer',
-                                        ...(g.is_no_internet
-                                          ? { borderColor: 'rgba(220, 38, 38, 0.4)', background: 'rgba(220, 38, 38, 0.08)' }
-                                          : undefined),
-                                      }}
-                                      title={`Click to filter by "${g.name}"`}
-                                    >
-                                      {g.is_no_internet && (
-                                        <IconBan size={11} style={{ marginRight: '0.25rem' }} />
-                                      )}
-                                      {g.name}
-                                      {g.is_protected && (
-                                        <span style={{ marginLeft: '0.3rem', display: 'inline-flex', alignItems: 'center' }} title="Protected Group">
-                                          <IconLock size={11} style={{ color: 'var(--text-secondary)' }} />
-                                        </span>
-                                      )}
-                                    </span>
-                                  ))
-                                ) : (
-                                  <span className="group-tag-pill">Default</span>
-                                )}
-                              </div>
-                            </td>
-                            <td className="cell-actions">
-                              {u.status !== 'deleted' ? (
-                                <div className="table-actions-cell">
-                                  {u.groups?.some((g) => g.is_protected) && currentUser.role === 'subadmin' ? (
-                                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }} title="User is assigned to a protected group. Only administrators can edit or delete this user.">
-                                      <IconLock size={11} />
-                                      <span>Protected (Admin Only)</span>
-                                    </span>
-                                  ) : (
-                                    <>
-                                      <button
-                                        className="btn-text-action"
-                                        onClick={() => openEditModal(u)}
-                                      >
-                                        Edit
-                                      </button>
-                                      <button
-                                        className="btn-text-action"
-                                        onClick={() => handleDeleteUser(u)}
-                                      >
-                                        Delete
-                                      </button>
-                                    </>
-                                  )}
-                                </div>
-                              ) : (
-                                <div style={{ textAlign: 'right', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                                  Pending Delete
-                                </div>
-                              )}
-                            </td>
-                          </tr>
-                        );
-                      })
+                      paginatedDashboardUsers.map((u) => renderUserRow(u))
                     )}
                   </tbody>
                 </table>
+
+                {/* Dashboard Pagination Bar & See All Users Button */}
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '0.85rem 1.15rem',
+                  borderTop: '1px solid var(--border-subtle)',
+                  background: 'var(--bg-card)',
+                  flexWrap: 'wrap',
+                  gap: '0.75rem'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                      Showing {displayedUsers.length === 0 ? 0 : (dashboardPage - 1) * DASHBOARD_PAGE_SIZE + 1}–{Math.min(dashboardPage * DASHBOARD_PAGE_SIZE, displayedUsers.length)} of {displayedUsers.length} users
+                    </span>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => handleTabChange('users')}
+                      style={{ fontSize: '0.76rem', padding: '0.3rem 0.65rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+                      title="Open dedicated page with all users"
+                    >
+                      <span>See All Users ({users.length})</span>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <line x1="5" y1="12" x2="19" y2="12" />
+                        <polyline points="12 5 19 12 12 19" />
+                      </svg>
+                    </button>
+                  </div>
+
+                  {dashboardTotalPages > 1 && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        disabled={dashboardPage <= 1}
+                        onClick={() => setDashboardPage((p) => Math.max(1, p - 1))}
+                        style={{ fontSize: '0.76rem', padding: '0.3rem 0.6rem' }}
+                      >
+                        ← Prev
+                      </button>
+                      
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
+                        {Array.from({ length: dashboardTotalPages }, (_, i) => i + 1).map((pageNum) => (
+                          <button
+                            key={pageNum}
+                            type="button"
+                            className={`btn btn-sm ${dashboardPage === pageNum ? 'btn-primary' : 'btn-ghost'}`}
+                            onClick={() => setDashboardPage(pageNum)}
+                            style={{
+                              minWidth: '26px',
+                              height: '26px',
+                              padding: '0 0.3rem',
+                              fontSize: '0.75rem',
+                              fontWeight: dashboardPage === pageNum ? 700 : 500
+                            }}
+                          >
+                            {pageNum}
+                          </button>
+                        ))}
+                      </div>
+
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        disabled={dashboardPage >= dashboardTotalPages}
+                        onClick={() => setDashboardPage((p) => Math.min(dashboardTotalPages, p + 1))}
+                        style={{ fontSize: '0.76rem', padding: '0.3rem 0.6rem' }}
+                      >
+                        Next →
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ============================================================
+              VIEW: DEDICATED ALL USERS PAGE
+              Opened by clicking "All Users" in sidebar or "See All" on dashboard
+              ============================================================ */}
+          {activeTab === 'users' && (
+            <div className="page-content-animated" key="users">
+              {/* Small Top Pill */}
+              <div>
+                <div className="gateway-pill">
+                  <span className="gateway-pill-dot"></span>
+                  <span>Network Directory • Unbounded Client Inventory</span>
+                </div>
+              </div>
+
+              {/* All Users Page Headline */}
+              <div className="header-row">
+                <div className="title-col">
+                  <h1 className="page-headline">All Users & Devices</h1>
+                  <p className="page-description">
+                    Complete inventory of all {users.length} registered hardware client devices. View full records without pagination, perform batch assignments, and export to CSV.
+                  </p>
+                </div>
+                <div className="actions-col" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                  <button className="btn btn-secondary" onClick={() => handleTabChange('dashboard')}>
+                    ← Back to Dashboard
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    onClick={handleExportCSV}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+                  >
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                      <polyline points="7 10 12 15 17 10" />
+                      <line x1="12" y1="15" x2="12" y2="3" />
+                    </svg>
+                    <span>Export CSV</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Users Stats Summary Ribbon */}
+              <div className="stats-grid-row" style={{ marginBottom: '1.25rem' }}>
+                <div className="stat-card-box">
+                  <div className="stat-top-row">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ opacity: 0.7 }}>
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                        <circle cx="9" cy="7" r="4" />
+                        <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                      </svg>
+                      <span className="stat-title-label">TOTAL DEVICES</span>
+                    </div>
+                    <span className="stat-index-badge">01</span>
+                  </div>
+                  <div className="stat-big-value">{users.length}</div>
+                  <div className="stat-footer-text">Registered MAC addresses</div>
+                </div>
+
+                <div className="stat-card-box">
+                  <div className="stat-top-row">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ opacity: 0.7 }}>
+                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                        <polyline points="22 4 12 14.01 9 11.01" />
+                      </svg>
+                      <span className="stat-title-label">ACTIVE / APPLIED</span>
+                    </div>
+                    <span className="stat-index-badge">02</span>
+                  </div>
+                  <div className="stat-big-value">
+                    {users.filter((u) => u.status === 'applied').length}
+                  </div>
+                  <div className="stat-footer-text">Synced with OpenWrt firewall</div>
+                </div>
+
+                <div className="stat-card-box">
+                  <div className="stat-top-row">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ opacity: 0.7 }}>
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                        <polyline points="14 2 14 8 20 8" />
+                      </svg>
+                      <span className="stat-title-label">PENDING SYNC</span>
+                    </div>
+                    <span className="stat-index-badge">03</span>
+                  </div>
+                  <div className="stat-big-value">
+                    {users.filter((u) => u.status !== 'applied').length}
+                  </div>
+                  <div className="stat-footer-text">Draft rules awaiting commit</div>
+                </div>
+
+                <div className="stat-card-box">
+                  <div className="stat-top-row">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ opacity: 0.7 }}>
+                        <circle cx="12" cy="12" r="10" />
+                        <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
+                      </svg>
+                      <span className="stat-title-label">NO INTERNET</span>
+                    </div>
+                    <span className="stat-index-badge">04</span>
+                  </div>
+                  <div className="stat-big-value">
+                    {users.filter((u) => u.groups?.some((g) => g.is_no_internet)).length}
+                  </div>
+                  <div className="stat-footer-text">WAN access blocked</div>
+                </div>
+              </div>
+
+              {/* Full User Table Card */}
+              <div className="table-card-container">
+                {/* Search & Filter Header */}
+                <div className="table-header-tools">
+                  <div className="search-input-wrapper">
+                    <svg className="search-input-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <circle cx="11" cy="11" r="8" />
+                      <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                    </svg>
+                    <input
+                      type="text"
+                      className="search-input-field"
+                      placeholder="Search by name, MAC address, vendor..."
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                    />
+                    {search && (
+                      <button
+                        type="button"
+                        className="search-clear-btn"
+                        onClick={() => setSearch('')}
+                        title="Clear search"
+                        aria-label="Clear search"
+                      >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                          <line x1="18" y1="6" x2="6" y2="18" />
+                          <line x1="6" y1="6" x2="18" y2="18" />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+
+                  <select
+                    className="group-dropdown-select"
+                    value={selectedGroup}
+                    onChange={(e) => setSelectedGroup(e.target.value)}
+                  >
+                    <option value="ALL">All Groups</option>
+                    {groups.map((g) => (
+                      <option key={g.id} value={g.id}>
+                        {g.name} {g.is_no_internet ? '(No Internet)' : ''}
+                      </option>
+                    ))}
+                  </select>
+
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    onClick={handleRefreshData}
+                    title="Refresh data"
+                    style={{ padding: '0.45rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                  >
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <polyline points="1 4 1 10 7 10"/>
+                      <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
+                    </svg>
+                  </button>
+                </div>
+
+                {/* Status Filter Chips + Results Count + Actions */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.65rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                    {(['all', 'applied', 'added', 'modified', 'deleted'] as const).map((status) => {
+                      const counts: Record<string, number> = {
+                        all: users.length,
+                        applied: users.filter((u) => u.status === 'applied').length,
+                        added: users.filter((u) => u.status === 'added').length,
+                        modified: users.filter((u) => u.status === 'modified').length,
+                        deleted: users.filter((u) => u.status === 'deleted').length,
+                      };
+                      if (status !== 'all' && counts[status] === 0) return null;
+                      return (
+                        <button
+                          key={status}
+                          type="button"
+                          className={`status-filter-chip ${statusFilter === status ? 'active' : ''}`}
+                          onClick={() => setStatusFilter(status)}
+                        >
+                          <span style={{ textTransform: 'capitalize' }}>{status}</span>
+                          <span className="status-filter-count">{counts[status]}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>
+                      {displayedUsers.length === users.length
+                        ? `Showing all ${users.length} users`
+                        : `${displayedUsers.length} of ${users.length} users`}
+                    </span>
+
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm"
+                      onClick={handleExportCSV}
+                      style={{ fontSize: '0.75rem', padding: '0.3rem 0.65rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
+                      title="Export all users as CSV"
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                        <polyline points="7 10 12 15 17 10" />
+                        <line x1="12" y1="15" x2="12" y2="3" />
+                      </svg>
+                      <span>CSV</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm"
+                      onClick={() => setShowImportModal(true)}
+                      style={{ fontSize: '0.75rem', padding: '0.3rem 0.65rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
+                      title="Batch import devices from CSV or text"
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                        <polyline points="17 8 12 3 7 8" />
+                        <line x1="12" y1="3" x2="12" y2="15" />
+                      </svg>
+                      <span>Import</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      className={`btn btn-sm ${isSelectionMode ? 'btn-primary' : 'btn-ghost'}`}
+                      onClick={handleToggleSelectionMode}
+                      style={{
+                        fontSize: '0.75rem',
+                        padding: '0.3rem 0.65rem',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.3rem',
+                      }}
+                      title={isSelectionMode ? 'Exit selection mode' : 'Select multiple devices'}
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        {isSelectionMode ? (
+                          <polyline points="20 6 9 17 4 12" />
+                        ) : (
+                          <>
+                            <rect x="3" y="3" width="18" height="18" rx="2" />
+                            <path d="m9 12 2 2 4-4" />
+                          </>
+                        )}
+                      </svg>
+                      <span>{isSelectionMode ? 'Done' : 'Select'}</span>
+                    </button>
+
+                    {isSelectionMode && selectedUserIds.size > 0 && (
+                      <>
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-sm"
+                          onClick={() => setShowBulkGroupModal(true)}
+                          style={{ fontSize: '0.75rem', padding: '0.3rem 0.65rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
+                          title="Assign selected users to group"
+                        >
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                            <circle cx="9" cy="7" r="4" />
+                            <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                            <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                          </svg>
+                          <span>Group ({selectedUserIds.size})</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-sm"
+                          onClick={handleBulkDelete}
+                          style={{ fontSize: '0.75rem', padding: '0.3rem 0.65rem', color: '#ef4444', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
+                          title="Delete selected users"
+                        >
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <polyline points="3 6 5 6 21 6" />
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                          </svg>
+                          <span>Delete ({selectedUserIds.size})</span>
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* All Users Data Table */}
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      {isSelectionMode && (
+                        <th className="cell-checkbox" style={{ width: '44px', padding: '0.75rem 0.5rem 0.75rem 1rem' }}>
+                          <input
+                            type="checkbox"
+                            checked={selectableUsers.length > 0 && selectedUserIds.size === selectableUsers.length}
+                            onChange={handleToggleSelectAll}
+                            disabled={selectableUsers.length === 0}
+                            style={{ cursor: selectableUsers.length === 0 ? 'not-allowed' : 'pointer', width: '15px', height: '15px', accentColor: 'var(--text-primary)' }}
+                            title={selectableUsers.length === 0 ? 'No selectable users' : 'Select all'}
+                          />
+                        </th>
+                      )}
+                      <th
+                        style={{ width: '130px', cursor: 'pointer', userSelect: 'none' }}
+                        onClick={() => handleSortToggle('status')}
+                        title="Sort by status"
+                      >
+                        STATUS{sortArrow('status')}
+                      </th>
+                      <th
+                        style={{ cursor: 'pointer', userSelect: 'none' }}
+                        onClick={() => handleSortToggle('name')}
+                        title="Sort by name"
+                      >
+                        NAME{sortArrow('name')}
+                      </th>
+                      <th
+                        style={{ cursor: 'pointer', userSelect: 'none' }}
+                        onClick={() => handleSortToggle('mac_address')}
+                        title="Sort by MAC"
+                      >
+                        MAC ADDRESS{sortArrow('mac_address')}
+                      </th>
+                      <th>ASSIGNED GROUPS</th>
+                      <th style={{ textAlign: 'right', width: '150px' }}>ACTIONS</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {displayedUsers.length === 0 ? (
+                      <tr>
+                        <td colSpan={isSelectionMode ? 6 : 5} style={{ textAlign: 'center', padding: '3.5rem' }}>
+                          {loading ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem' }}>
+                              <div className="loading-spinner"></div>
+                              <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Loading users...</span>
+                            </div>
+                          ) : (
+                            <div className="empty-state">
+                              <div className="empty-state-icon">
+                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                                  <circle cx="9" cy="7" r="4" />
+                                  <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                                  <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                                </svg>
+                              </div>
+                              <span className="empty-state-text">No users found</span>
+                              <span className="empty-state-hint">{search ? 'Try a different search query' : 'Register a device or clear filters'}</span>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    ) : (
+                      displayedUsers.map((u) => renderUserRow(u))
+                    )}
+                  </tbody>
+                </table>
+
+                {/* Bottom Footer Bar */}
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '0.85rem 1.15rem',
+                  borderTop: '1px solid var(--border-subtle)',
+                  background: 'var(--bg-card)',
+                  flexWrap: 'wrap',
+                  gap: '0.75rem'
+                }}>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                    Showing all {displayedUsers.length} users • Unbounded directory view
+                  </span>
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => handleTabChange('dashboard')}
+                    style={{ fontSize: '0.76rem', padding: '0.3rem 0.65rem' }}
+                  >
+                    ← Back to Dashboard (10 per page)
+                  </button>
+                </div>
               </div>
             </div>
           )}
@@ -3397,7 +3917,7 @@ export default function DashboardPage() {
                     <span className="history-live-pill">Live</span>
                   </div>
                   <div className="history-telemetry-value">
-                    v{liveHistoryItem ? liveHistoryItem.version : (stats.version || 1)}
+                    v{liveHistoryItem ? liveHistoryItem.version : (stats.current_version || 1)}
                   </div>
                   <div className="history-telemetry-subtext">
                     <span>{liveHistoryItem?.created_at ? new Date(liveHistoryItem.created_at).toLocaleString() : 'Currently deployed'}</span>
@@ -3429,7 +3949,7 @@ export default function DashboardPage() {
                     </svg>
                   </div>
                   <div className="history-telemetry-value" style={{ fontFamily: 'var(--font-mono)', fontSize: '1.05rem', letterSpacing: '-0.02em' }}>
-                    {liveHistoryItem?.hash ? liveHistoryItem.hash.substring(0, 10) + '...' : (stats.config_hash ? stats.config_hash.substring(0, 10) + '...' : 'Verified')}
+                    {liveHistoryItem?.hash ? liveHistoryItem.hash.substring(0, 10) + '...' : 'Verified'}
                   </div>
                   <div className="history-telemetry-subtext" style={{ color: 'var(--status-applied-text)' }}>
                     <span>● SHA-256 Checksum Verified</span>
@@ -3771,7 +4291,7 @@ export default function DashboardPage() {
                                 <div>
                                   <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>Comparing:</span>{' '}
                                   <span>v{selectedHistoryItem.version} (Archive)</span> →{' '}
-                                  <span style={{ fontWeight: 600, color: 'var(--status-applied-text)' }}>v{liveHistoryItem?.version || stats.version || 1} (Live)</span>
+                                  <span style={{ fontWeight: 600, color: 'var(--status-applied-text)' }}>v{liveHistoryItem?.version || stats.current_version || 1} (Live)</span>
                                 </div>
                                 <div style={{ fontSize: '0.78rem' }}>
                                   <strong>Device Delta:</strong>{' '}

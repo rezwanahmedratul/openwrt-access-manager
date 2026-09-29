@@ -8,6 +8,7 @@ const nextConfig = {
   },
   async rewrites() {
     return [
+      { source: '/users', destination: '/?tab=users' },
       { source: '/history', destination: '/?tab=history' },
       { source: '/groups', destination: '/?tab=groups' },
       { source: '/account', destination: '/?tab=account' },
