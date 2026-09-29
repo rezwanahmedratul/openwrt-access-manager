@@ -5,15 +5,37 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+
+# Auto-detect project directory containing docker-compose.prod.yml
+if [ -f "$SCRIPT_DIR/docker-compose.prod.yml" ]; then
+    PROJECT_ROOT="$SCRIPT_DIR"
+elif [ -f "$(dirname "$SCRIPT_DIR")/docker-compose.prod.yml" ]; then
+    PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+else
+    PROJECT_ROOT="$(pwd)"
+fi
+
 cd "$PROJECT_ROOT"
 
 echo "=== [$(date '+%Y-%m-%d %H:%M:%S')] Starting Production Deployment ==="
+echo "==> Working directory: $PROJECT_ROOT"
+
+# Check Docker Compose command availability (v2 plugin or v1 standalone)
+if docker compose version &> /dev/null; then
+    DOCKER_COMPOSE="docker compose"
+elif command -v docker-compose &> /dev/null; then
+    DOCKER_COMPOSE="docker-compose"
+else
+    echo "ERROR: Neither 'docker compose' nor 'docker-compose' found on $(hostname)." >&2
+    exit 1
+fi
 
 # 1. Check for required compose file
 COMPOSE_FILE="docker-compose.prod.yml"
 if [ ! -f "$COMPOSE_FILE" ]; then
     echo "ERROR: $COMPOSE_FILE not found in $PROJECT_ROOT" >&2
+    echo "Available files in $PROJECT_ROOT:" >&2
+    ls -la "$PROJECT_ROOT" >&2
     exit 1
 fi
 
@@ -30,11 +52,11 @@ fi
 
 # 4. Pull the latest image
 echo "==> Pulling latest image..."
-docker compose -f "$COMPOSE_FILE" pull app
+$DOCKER_COMPOSE -f "$COMPOSE_FILE" pull app
 
 # 5. Spin up services (zero-downtime recreation where possible)
 echo "==> Updating containers..."
-docker compose -f "$COMPOSE_FILE" up -d --remove-orphans
+$DOCKER_COMPOSE -f "$COMPOSE_FILE" up -d --remove-orphans
 
 # 6. Clean up dangling images
 echo "==> Cleaning up unused images..."
