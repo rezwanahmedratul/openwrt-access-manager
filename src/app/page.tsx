@@ -3003,31 +3003,36 @@ export default function DashboardPage() {
           <div className="floating-pending-bar">
             <div className="pending-left-info">
               <span className="pending-dot-pulse"></span>
-              <span>
+              <span className="pending-count-badge">{stats.pending_changes}</span>
+              <span className="pending-text-desktop">
                 {stats.pending_changes} pending {stats.pending_changes === 1 ? 'change' : 'changes'} in draft
+              </span>
+              <span className="pending-text-mobile">
+                draft
               </span>
             </div>
             <div className="pending-btn-actions">
               <button
-                className="btn btn-secondary"
+                type="button"
+                className="btn btn-secondary pending-btn-undo"
                 onClick={handleUndo}
-                style={{ padding: '0.45rem 0.95rem', fontSize: '0.8rem' }}
               >
                 Undo
               </button>
               <button
-                className="btn btn-ghost"
+                type="button"
+                className="btn btn-ghost pending-btn-discard"
                 onClick={handleDiscard}
-                style={{ color: 'inherit', padding: '0.45rem 0.95rem', fontSize: '0.8rem' }}
               >
                 Discard
               </button>
               <button
-                className="btn btn-primary"
+                type="button"
+                className="btn btn-primary pending-btn-apply"
                 onClick={handleApply}
-                style={{ padding: '0.45rem 1.1rem', fontSize: '0.8rem' }}
               >
-                Apply Changes
+                <span className="btn-text-desktop">Apply Changes</span>
+                <span className="btn-text-mobile">Apply</span>
               </button>
             </div>
           </div>

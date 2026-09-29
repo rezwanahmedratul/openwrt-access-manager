@@ -1027,12 +1027,88 @@ body {
   height: 8px;
   border-radius: 50%;
   background: var(--btn-primary-text);
+  flex-shrink: 0;
+  animation: pendingPulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pendingPulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.35;
+    transform: scale(0.85);
+  }
+}
+
+.pending-count-badge {
+  display: none;
+}
+
+.pending-text-desktop {
+  display: inline;
+}
+
+.pending-text-mobile {
+  display: none;
+}
+
+.btn-text-desktop {
+  display: inline;
+}
+
+.btn-text-mobile {
+  display: none;
 }
 
 .pending-btn-actions {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+}
+
+.pending-btn-actions .btn {
+  padding: 0.45rem 1rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  border-radius: var(--radius-sm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+}
+
+.floating-pending-bar .btn-primary {
+  background: var(--btn-primary-text);
+  color: var(--btn-primary-bg);
+  border-color: var(--btn-primary-text);
+}
+
+.floating-pending-bar .btn-primary:hover {
+  background: var(--btn-primary-text);
+  opacity: 0.92;
+  border-color: var(--btn-primary-text);
+}
+
+.floating-pending-bar .btn-ghost {
+  color: inherit;
+}
+
+.floating-pending-bar .btn-ghost:hover {
+  color: inherit;
+  background: rgba(125, 125, 125, 0.18);
+}
+
+.floating-pending-bar .btn-secondary {
+  background: rgba(125, 125, 125, 0.15);
+  color: inherit;
+  border: 1px solid rgba(125, 125, 125, 0.28);
+}
+
+.floating-pending-bar .btn-secondary:hover {
+  background: rgba(125, 125, 125, 0.25);
+  border-color: rgba(125, 125, 125, 0.4);
 }
 
 /* ============================================================
@@ -1284,10 +1360,17 @@ body {
     border-right: none !important;
     border-top: 1px solid var(--border-subtle) !important;
     background: var(--bg-card) !important;
-    backdrop-filter: blur(16px) !important;
-    -webkit-backdrop-filter: blur(16px) !important;
+    background-color: var(--bg-card) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
     z-index: 1000 !important;
     box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.08) !important;
+    -webkit-transform: translate3d(0, 0, 0) !important;
+    transform: translate3d(0, 0, 0) !important;
+    -webkit-backface-visibility: hidden !important;
+    backface-visibility: hidden !important;
+    will-change: transform !important;
+    contain: layout paint !important;
   }
 
   .sidebar-top {
@@ -1376,30 +1459,119 @@ body {
 
   /* Floating Staged Pending Bar */
   .floating-pending-bar-wrapper {
-    left: 0;
-    right: 0;
-    bottom: calc(64px + env(safe-area-inset-bottom, 0px) + 0.65rem) !important;
-    padding: 0 0.75rem !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: calc(58px + env(safe-area-inset-bottom, 0px) + 0.5rem) !important;
+    padding: 0 0.5rem !important;
     z-index: 1010 !important;
+    -webkit-transform: translate3d(0, 0, 0) !important;
+    transform: translate3d(0, 0, 0) !important;
+    -webkit-backface-visibility: hidden !important;
+    backface-visibility: hidden !important;
+    will-change: transform !important;
+    pointer-events: none !important;
   }
 
   .floating-pending-bar {
     width: 100% !important;
-    max-width: 440px !important;
-    padding: 0.65rem 0.9rem !important;
+    max-width: 100% !important;
+    padding: 0.4rem 0.6rem !important;
+    border-radius: var(--radius-pill) !important;
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    gap: 0.35rem !important;
+    box-sizing: border-box !important;
   }
 
   .pending-left-info {
-    font-size: 0.8rem !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 0.35rem !important;
+    font-size: 0.74rem !important;
+    font-weight: 600 !important;
+    white-space: nowrap !important;
+    flex-shrink: 0 !important;
+  }
+
+  .pending-dot-pulse {
+    width: 6px !important;
+    height: 6px !important;
+  }
+
+  .pending-count-badge {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    min-width: 18px !important;
+    height: 18px !important;
+    padding: 0 4px !important;
+    border-radius: 999px !important;
+    font-size: 0.68rem !important;
+    font-weight: 700 !important;
+    line-height: 1 !important;
+    background: rgba(125, 125, 125, 0.22) !important;
+    color: inherit !important;
+    border: 1px solid rgba(125, 125, 125, 0.35) !important;
+  }
+
+  .pending-text-desktop {
+    display: none !important;
+  }
+
+  .pending-text-mobile {
+    display: inline !important;
+    font-size: 0.72rem !important;
+    opacity: 0.9 !important;
   }
 
   .pending-btn-actions {
-    gap: 0.35rem !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 0.25rem !important;
+    flex-shrink: 0 !important;
   }
 
   .pending-btn-actions .btn {
-    padding: 0.4rem 0.75rem !important;
-    font-size: 0.76rem !important;
+    padding: 0.3rem 0.5rem !important;
+    font-size: 0.72rem !important;
+    font-weight: 600 !important;
+    height: 28px !important;
+    min-height: 28px !important;
+    line-height: 1 !important;
+    border-radius: var(--radius-sm) !important;
+    white-space: nowrap !important;
+  }
+
+  .btn-text-desktop {
+    display: none !important;
+  }
+
+  .btn-text-mobile {
+    display: inline !important;
+  }
+
+  @media (max-width: 380px) {
+    .floating-pending-bar {
+      padding: 0.35rem 0.45rem !important;
+      gap: 0.25rem !important;
+    }
+    .pending-left-info {
+      font-size: 0.7rem !important;
+      gap: 0.25rem !important;
+    }
+    .pending-text-mobile {
+      font-size: 0.68rem !important;
+    }
+    .pending-btn-actions {
+      gap: 0.2rem !important;
+    }
+    .pending-btn-actions .btn {
+      padding: 0.25rem 0.4rem !important;
+      font-size: 0.68rem !important;
+      height: 26px !important;
+      min-height: 26px !important;
+    }
   }
 
   /* Page Typography & Actions */
