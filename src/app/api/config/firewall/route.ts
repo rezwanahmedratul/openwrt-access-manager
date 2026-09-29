@@ -38,7 +38,8 @@ export async function GET(request: Request) {
         mac_address: u.mac_address,
         is_no_internet: Boolean(u.user_groups?.some((ug: any) => ug.groups?.is_no_internet)),
       }));
-      content = generateFirewallConfig(mapped);
+      const state = getMockState();
+      content = generateFirewallConfig(mapped, state.mockMacAuth.enabled);
     } else {
       content = config.firewall_content;
     }

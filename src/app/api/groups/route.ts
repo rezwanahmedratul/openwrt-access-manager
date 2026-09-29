@@ -296,6 +296,16 @@ export async function PATCH(request: Request) {
       if (fetchErr) return NextResponse.json({ error: fetchErr.message }, { status: 500 });
       if (!currentGroup) return NextResponse.json({ error: 'Group not found' }, { status: 404 });
 
+      // Default group cannot be renamed, protected, or tagged as No Internet
+      if (currentGroup.name.toLowerCase() === 'default') {
+        if (is_protected === true || is_no_internet === true || (name && name.trim().toLowerCase() !== 'default')) {
+          return NextResponse.json(
+            { error: 'The "Default" fallback group cannot be renamed, protected, or tagged as No Internet.' },
+            { status: 400 }
+          );
+        }
+      }
+
       // Incompatibility: cannot be both Protected and No Internet
       if (is_protected === true && (currentGroup.is_no_internet || is_no_internet === true)) {
         return NextResponse.json(
@@ -409,6 +419,16 @@ export async function PATCH(request: Request) {
 
       if (!currentGroup) {
         return NextResponse.json({ error: 'Group not found' }, { status: 404 });
+      }
+
+      // Default group cannot be renamed, protected, or tagged as No Internet
+      if (currentGroup.name.toLowerCase() === 'default') {
+        if (is_protected === true || is_no_internet === true || (name && name.trim().toLowerCase() !== 'default')) {
+          return NextResponse.json(
+            { error: 'The "Default" fallback group cannot be renamed, protected, or tagged as No Internet.' },
+            { status: 400 }
+          );
+        }
       }
 
       // Incompatibility: cannot be both Protected and No Internet

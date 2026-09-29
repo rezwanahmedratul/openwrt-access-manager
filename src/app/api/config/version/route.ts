@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServiceSupabase } from '@/lib/supabase';
 import { getMockState } from '@/lib/mock-store';
+import { generateFirewallConfig, generateEthersConfig, computeConfigHash, UserConfigInput } from '@/lib/config-generator';
 
 function authenticateRouter(request: Request): boolean {
   const authHeader = request.headers.get('authorization') || '';
@@ -35,9 +36,21 @@ export async function GET(request: Request) {
     });
   } else {
     const state = getMockState();
+    const mapped: UserConfigInput[] = state.mockUsers.map((u) => {
+      const uGroups = u.groups.map((ug) => state.mockGroups.find((mg) => mg.id === ug.id) || ug);
+      return {
+        name: u.name,
+        mac_address: u.mac_address,
+        is_no_internet: Boolean(uGroups.some((g) => g.is_no_internet)),
+      };
+    });
+    const firewall = generateFirewallConfig(mapped, state.mockMacAuth.enabled);
+    const ethers = generateEthersConfig(state.mockUsers);
+    const hash = computeConfigHash(firewall, ethers);
+
     return NextResponse.json({
       version: state.mockVersion,
-      hash: 'mock-hash-v' + state.mockVersion,
+      hash,
       created_at: state.mockLastApplied,
     });
   }

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServiceSupabase } from '@/lib/supabase';
 import { getMockState } from '@/lib/mock-store';
+import { generateFirewallConfig, generateEthersConfig, computeConfigHash, UserConfigInput } from '@/lib/config-generator';
 
 export async function GET() {
   const supabase = getServiceSupabase();
@@ -19,18 +20,30 @@ export async function GET() {
     return NextResponse.json({ history: configs || [] });
   } else {
     const state = getMockState();
+    const mapped: UserConfigInput[] = state.mockUsers.map((u) => {
+      const uGroups = u.groups.map((ug) => state.mockGroups.find((mg) => mg.id === ug.id) || ug);
+      return {
+        name: u.name,
+        mac_address: u.mac_address,
+        is_no_internet: Boolean(uGroups.some((g) => g.is_no_internet)),
+      };
+    });
+    const firewallContent = generateFirewallConfig(mapped, state.mockMacAuth.enabled);
+    const ethersContent = generateEthersConfig(state.mockUsers);
+    const hash = computeConfigHash(firewallContent, ethersContent);
+
     return NextResponse.json({
       history: [
         {
           id: 'mock-conf-1',
           version: state.mockVersion,
-          hash: 'mock-hash-v' + state.mockVersion,
+          hash,
           user_count: state.mockUsers.length,
           is_current: true,
           metadata: { applied_at: state.mockLastApplied },
           created_at: state.mockLastApplied || new Date().toISOString(),
-          firewall_content: '',
-          ethers_content: '',
+          firewall_content: firewallContent,
+          ethers_content: ethersContent,
         },
       ],
     });

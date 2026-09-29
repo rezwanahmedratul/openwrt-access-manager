@@ -179,6 +179,46 @@ export async function POST(request: Request) {
         if (existingUser) {
           return NextResponse.json({ error: `MAC address ${normalizedMacStr} already assigned to user ${existingUser.name}` }, { status: 400 });
         }
+
+        const { data: pendingDrafts } = await supabase
+          .from('draft_changes')
+          .select('id, user_data')
+          .neq('operation', 'DELETE');
+
+        const draftDup = (pendingDrafts || []).find(
+          (d: any) => d.user_data?.mac_address === normalizedMacStr
+        );
+        if (draftDup) {
+          return NextResponse.json(
+            { error: `MAC address ${normalizedMacStr} is already queued in pending draft changes for "${draftDup.user_data?.name}".` },
+            { status: 400 }
+          );
+        }
+      } else if (operation === 'MODIFY') {
+        const { data: existingUsers } = await supabase
+          .from('users')
+          .select('id, name')
+          .eq('mac_address', normalizedMacStr);
+
+        const conflictUser = (existingUsers || []).find((u: any) => u.id !== user_id);
+        if (conflictUser) {
+          return NextResponse.json({ error: `MAC address ${normalizedMacStr} already assigned to user ${conflictUser.name}` }, { status: 400 });
+        }
+
+        const { data: pendingDrafts } = await supabase
+          .from('draft_changes')
+          .select('id, user_id, user_data')
+          .neq('operation', 'DELETE');
+
+        const draftDup = (pendingDrafts || []).find(
+          (d: any) => d.user_id !== user_id && d.user_data?.mac_address === normalizedMacStr
+        );
+        if (draftDup) {
+          return NextResponse.json(
+            { error: `MAC address ${normalizedMacStr} is already queued in pending draft changes for "${draftDup.user_data?.name}".` },
+            { status: 400 }
+          );
+        }
       }
 
       const newChange = {
@@ -205,6 +245,41 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true, change: data });
     } else {
       const state = getMockState();
+
+      if (operation === 'ADD') {
+        const existingUser = state.mockUsers.find((u) => u.mac_address === normalizedMacStr);
+        if (existingUser) {
+          return NextResponse.json({ error: `MAC address ${normalizedMacStr} already assigned to user ${existingUser.name}` }, { status: 400 });
+        }
+
+        const pendingDup = state.mockDraftChanges.find(
+          (d) => d.operation !== 'DELETE' && d.user_data?.mac_address === normalizedMacStr
+        );
+        if (pendingDup) {
+          return NextResponse.json(
+            { error: `MAC address ${normalizedMacStr} is already queued in pending draft changes for "${pendingDup.user_data?.name}".` },
+            { status: 400 }
+          );
+        }
+      } else if (operation === 'MODIFY') {
+        const conflictUser = state.mockUsers.find(
+          (u) => u.id !== user_id && u.mac_address === normalizedMacStr
+        );
+        if (conflictUser) {
+          return NextResponse.json({ error: `MAC address ${normalizedMacStr} already assigned to user ${conflictUser.name}` }, { status: 400 });
+        }
+
+        const pendingDup = state.mockDraftChanges.find(
+          (d) => d.user_id !== user_id && d.operation !== 'DELETE' && d.user_data?.mac_address === normalizedMacStr
+        );
+        if (pendingDup) {
+          return NextResponse.json(
+            { error: `MAC address ${normalizedMacStr} is already queued in pending draft changes for "${pendingDup.user_data?.name}".` },
+            { status: 400 }
+          );
+        }
+      }
+
       const changeId = 'mock-change-' + Date.now();
       const newChange: DraftChange = {
         id: changeId,

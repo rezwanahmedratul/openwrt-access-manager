@@ -5,6 +5,88 @@ import { UserViewModel, Group, DashboardStats, SessionUser } from '@/lib/types';
 import { normalizeMac } from '@/lib/normalize-mac';
 import { normalizeName } from '@/lib/normalize-name';
 
+// ============================================================
+// Minimal Monochrome SVG Icons (Clean Linear / Vercel Style)
+// ============================================================
+
+const IconLock = ({ size = 13, style }: { size?: number; style?: React.CSSProperties }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline-block', verticalAlign: 'middle', ...style }}>
+    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+  </svg>
+);
+
+const IconUnlock = ({ size = 15, style }: { size?: number; style?: React.CSSProperties }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline-block', verticalAlign: 'middle', ...style }}>
+    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+    <path d="M7 11V7a5 5 0 0 1 9.9-1" />
+  </svg>
+);
+
+const IconBan = ({ size = 13, style }: { size?: number; style?: React.CSSProperties }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline-block', verticalAlign: 'middle', ...style }}>
+    <circle cx="12" cy="12" r="10" />
+    <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
+  </svg>
+);
+
+const IconGlobe = ({ size = 13, style }: { size?: number; style?: React.CSSProperties }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline-block', verticalAlign: 'middle', ...style }}>
+    <circle cx="12" cy="12" r="10" />
+    <line x1="2" y1="12" x2="22" y2="12" />
+    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+  </svg>
+);
+
+const IconInfinity = ({ size = 16, style }: { size?: number; style?: React.CSSProperties }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline-block', verticalAlign: 'middle', ...style }}>
+    <path d="M18.178 8c5.096 0 5.096 8 0 8-2.678 0-4.678-2.678-6.178-4-1.5-1.322-3.5-4-6.178-4-5.096 0-5.096 8 0 8 2.678 0 4.678-2.678 6.178-4 1.5-1.322 3.5-4 6.178-4z" />
+  </svg>
+);
+
+const IconClock = ({ size = 14, style }: { size?: number; style?: React.CSSProperties }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline-block', verticalAlign: 'middle', ...style }}>
+    <circle cx="12" cy="12" r="10" />
+    <polyline points="12 6 12 12 16 14" />
+  </svg>
+);
+
+const IconCalendar = ({ size = 15, style }: { size?: number; style?: React.CSSProperties }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline-block', verticalAlign: 'middle', ...style }}>
+    <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+    <line x1="16" y1="2" x2="16" y2="6" />
+    <line x1="8" y1="2" x2="8" y2="6" />
+    <line x1="3" y1="10" x2="21" y2="10" />
+  </svg>
+);
+
+const IconZap = ({ size = 13, style }: { size?: number; style?: React.CSSProperties }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline-block', verticalAlign: 'middle', ...style }}>
+    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+  </svg>
+);
+
+const IconAlertTriangle = ({ size = 16, style }: { size?: number; style?: React.CSSProperties }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline-block', verticalAlign: 'middle', ...style }}>
+    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+    <line x1="12" y1="9" x2="12" y2="13" />
+    <line x1="12" y1="17" x2="12.01" y2="17" />
+  </svg>
+);
+
+const IconClose = ({ size = 13, style }: { size?: number; style?: React.CSSProperties }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline-block', verticalAlign: 'middle', ...style }}>
+    <line x1="18" y1="6" x2="6" y2="18" />
+    <line x1="6" y1="6" x2="18" y2="18" />
+  </svg>
+);
+
+const IconCheck = ({ size = 12, style }: { size?: number; style?: React.CSSProperties }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline-block', verticalAlign: 'middle', ...style }}>
+    <polyline points="20 6 9 17 4 12" />
+  </svg>
+);
+
 export default function DashboardPage() {
   // Authentication & Session State
   const [currentUser, setCurrentUser] = useState<SessionUser | null>(null);
@@ -1174,9 +1256,10 @@ export default function DashboardPage() {
               <span>{notification.message}</span>
               <button
                 onClick={() => setNotification(null)}
-                style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer' }}
+                style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                aria-label="Close notification"
               >
-                ✕
+                <IconClose size={12} />
               </button>
             </div>
           )}
@@ -1207,7 +1290,7 @@ export default function DashboardPage() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.25)', padding: '0.4rem 0.85rem', borderRadius: 'var(--radius-md)' }}>
                       <span className="status-indicator-dot" style={{ background: '#ef4444' }}></span>
                       <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#ef4444' }}>
-                        MAC Auth: OFF (Open)
+                        MAC Auth: OFF (Open{stats.mac_auth.disabled_until ? ` until ${new Date(stats.mac_auth.disabled_until).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : ' permanently'})
                       </span>
                     </div>
                   ) : (
@@ -1383,8 +1466,8 @@ export default function DashboardPage() {
                       {groups.map((g) => {
                         const isRestricted = currentUser.role === 'subadmin' && g.is_protected;
                         let suffix = '';
-                        if (g.is_protected) suffix = ' (🔒 Protected)';
-                        if (g.is_no_internet) suffix = ' (🚫 No Internet)';
+                        if (g.is_protected) suffix = ' (Protected)';
+                        if (g.is_no_internet) suffix = ' (No Internet)';
                         return (
                           <option key={g.id} value={g.id} disabled={isRestricted}>
                             {g.name}{suffix}
@@ -1412,7 +1495,7 @@ export default function DashboardPage() {
 
                 {groups.find((g) => g.id === addSelectedGroup)?.is_no_internet && (
                   <div className="form-exclusive-notice" style={{ marginTop: '0.65rem' }}>
-                    <span>🚫</span>
+                    <IconBan size={15} />
                     <span><strong>No Internet Policy:</strong> WAN access will be blocked for this MAC address via dedicated firewall rule.</span>
                   </div>
                 )}
@@ -1455,7 +1538,7 @@ export default function DashboardPage() {
                   <option value="ALL">All Groups</option>
                   {groups.map((g) => (
                     <option key={g.id} value={g.id}>
-                      {g.name} {g.is_no_internet ? '(🚫 No Internet)' : ''}
+                      {g.name} {g.is_no_internet ? '(No Internet)' : ''}
                     </option>
                   ))}
                 </select>
@@ -1488,7 +1571,8 @@ export default function DashboardPage() {
                             <td>
                               {isNoInternetUser ? (
                                 <span className="badge-no-internet" title="Internet access blocked by firewall rule">
-                                  🚫 No Internet
+                                  <IconBan size={12} style={{ marginRight: '0.35rem' }} />
+                                  <span>No Internet</span>
                                 </span>
                               ) : (
                                 <span className={`status-badge-capsule status-badge-${u.status}`}>
@@ -1516,11 +1600,13 @@ export default function DashboardPage() {
                                           : undefined
                                       }
                                     >
-                                      {g.is_no_internet ? '🚫 ' : ''}
+                                      {g.is_no_internet && (
+                                        <IconBan size={11} style={{ marginRight: '0.25rem' }} />
+                                      )}
                                       {g.name}
                                       {g.is_protected && (
-                                        <span style={{ marginLeft: '0.25rem', color: '#DC2626', fontWeight: 700 }} title="Protected Group">
-                                          🔒
+                                        <span style={{ marginLeft: '0.3rem', display: 'inline-flex', alignItems: 'center' }} title="Protected Group">
+                                          <IconLock size={11} style={{ color: 'var(--text-secondary)' }} />
                                         </span>
                                       )}
                                     </span>
@@ -1534,8 +1620,9 @@ export default function DashboardPage() {
                             {u.status !== 'deleted' ? (
                               <div className="table-actions-cell">
                                 {u.groups?.some((g) => g.is_protected) && currentUser.role === 'subadmin' ? (
-                                  <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }} title="User is assigned to a protected group. Only administrators can edit or delete this user.">
-                                    🔒 Protected (Admin Only)
+                                  <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }} title="User is assigned to a protected group. Only administrators can edit or delete this user.">
+                                    <IconLock size={11} />
+                                    <span>Protected (Admin Only)</span>
                                   </span>
                                 ) : (
                                   <>
@@ -1692,17 +1779,20 @@ export default function DashboardPage() {
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
                               {group.is_protected && (
                                 <span className="badge-protected">
-                                  🔒 Protected
+                                  <IconLock size={12} style={{ marginRight: '0.3rem' }} />
+                                  <span>Protected</span>
                                 </span>
                               )}
                               {group.is_no_internet ? (
                                 <span className="badge-no-internet">
-                                  🚫 No Internet
+                                  <IconBan size={12} style={{ marginRight: '0.3rem' }} />
+                                  <span>No Internet</span>
                                 </span>
                               ) : (
                                 !group.is_protected && (
                                   <span className="badge-internet">
-                                    🌐 Internet Allowed
+                                    <IconGlobe size={12} style={{ marginRight: '0.3rem' }} />
+                                    <span>Internet Allowed</span>
                                   </span>
                                 )
                               )}
@@ -2020,7 +2110,7 @@ export default function DashboardPage() {
                     </p>
                     {stats.mac_auth && !stats.mac_auth.enabled && stats.mac_auth.disabled_until && (
                       <div className="mac-auth-timer-chip">
-                        <span>⏳</span>
+                        <IconClock size={13} />
                         <span>
                           Re-enables automatically on {new Date(stats.mac_auth.disabled_until).toLocaleString()}
                         </span>
@@ -2028,7 +2118,7 @@ export default function DashboardPage() {
                     )}
                     {stats.mac_auth && !stats.mac_auth.enabled && !stats.mac_auth.disabled_until && (
                       <div className="mac-auth-timer-chip">
-                        <span>♾️</span>
+                        <IconInfinity size={14} />
                         <span>Disabled permanently by Administrator</span>
                       </div>
                     )}
@@ -2070,9 +2160,10 @@ export default function DashboardPage() {
                     className="btn btn-secondary"
                     disabled={isTestingGateway}
                     onClick={handleTestGateway}
-                    style={{ fontSize: '0.8rem', padding: '0.45rem 0.85rem' }}
+                    style={{ fontSize: '0.8rem', padding: '0.45rem 0.85rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
                   >
-                    {isTestingGateway ? 'Pinging Gateway...' : '⚡ Test Connection'}
+                    <IconZap size={13} />
+                    <span>{isTestingGateway ? 'Pinging Gateway...' : 'Test Connection'}</span>
                   </button>
                 </div>
 
@@ -2277,9 +2368,16 @@ export default function DashboardPage() {
                       type="button"
                       className="btn btn-secondary"
                       onClick={() => handleCopyText('openwrt-secret-token-change-in-production', 'token')}
-                      style={{ fontSize: '0.8rem', padding: '0.45rem 0.8rem' }}
+                      style={{ fontSize: '0.8rem', padding: '0.45rem 0.8rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
                     >
-                      {tokenCopied ? '✓ Copied' : 'Copy Token'}
+                      {tokenCopied ? (
+                        <>
+                          <IconCheck size={12} />
+                          <span>Copied</span>
+                        </>
+                      ) : (
+                        <span>Copy Token</span>
+                      )}
                     </button>
                   </div>
                   <div className="form-help-caption">Pass this token in HTTP header <code>Authorization: Bearer &lt;token&gt;</code> for router requests.</div>
@@ -2526,8 +2624,8 @@ export default function DashboardPage() {
           <div className="modal-card">
             <div className="modal-header-row">
               <h3 className="modal-headline">Edit User</h3>
-              <button onClick={() => setModalMode(null)} className="modal-close-icon">
-                ✕
+              <button onClick={() => setModalMode(null)} className="modal-close-icon" aria-label="Close">
+                <IconClose size={13} />
               </button>
             </div>
 
@@ -2625,11 +2723,15 @@ export default function DashboardPage() {
                             }
                           }}
                         />
-                        <span>
-                          {group.is_no_internet ? '🚫 ' : ''}
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                          {group.is_no_internet && <IconBan size={12} />}
                           {group.name}
-                          {group.is_protected ? ' (🔒 Protected)' : ''}
-                          {group.is_no_internet ? ' (No Internet)' : ''}
+                          {group.is_protected && (
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.2rem', color: 'var(--text-secondary)' }}>
+                              (<IconLock size={11} /> Protected)
+                            </span>
+                          )}
+                          {group.is_no_internet && !group.is_protected && ' (No Internet)'}
                         </span>
                       </label>
                     );
@@ -2638,14 +2740,14 @@ export default function DashboardPage() {
 
                 {formGroupIds.some((id) => groups.find((g) => g.id === id)?.is_no_internet) && (
                   <div className="form-exclusive-notice">
-                    <span>🚫</span>
+                    <IconBan size={15} />
                     <span><strong>No Internet Policy:</strong> Devices in a No Internet group cannot be assigned to any group with internet access. Internet access will be blocked via firewall rule.</span>
                   </div>
                 )}
 
                 {formGroupIds.some((id) => groups.find((g) => g.id === id)?.is_protected) && (
                   <div className="form-exclusive-notice">
-                    <span>🔒</span>
+                    <IconLock size={15} />
                     <span><strong>Protected Group:</strong> Users in protected groups cannot be placed into No Internet groups unless removed from protected groups first.</span>
                   </div>
                 )}
@@ -2672,8 +2774,8 @@ export default function DashboardPage() {
           <div className="modal-card" style={{ maxWidth: '750px' }}>
             <div className="modal-header-row">
               <h3 className="modal-headline">Configuration History</h3>
-              <button onClick={() => setShowHistory(false)} className="modal-close-icon">
-                ✕
+              <button onClick={() => setShowHistory(false)} className="modal-close-icon" aria-label="Close">
+                <IconClose size={13} />
               </button>
             </div>
 
@@ -2733,15 +2835,16 @@ export default function DashboardPage() {
           <div className="mac-auth-modal-card">
             <div className="modal-header-row">
               <h3 className="modal-headline" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <span>🔓</span>
+                <IconUnlock size={17} />
                 <span>Turn OFF MAC Authentication</span>
               </h3>
               <button
                 onClick={() => setShowMacAuthModal(false)}
                 className="modal-close-icon"
                 disabled={isUpdatingMacAuth}
+                aria-label="Close"
               >
-                ✕
+                <IconClose size={13} />
               </button>
             </div>
 
@@ -2763,7 +2866,7 @@ export default function DashboardPage() {
                   onClick={() => setMacAuthDisableMode('infinite')}
                   title={currentUser?.role !== 'admin' ? 'Only Administrators can permanently disable MAC authentication' : 'Disable permanently until manually re-enabled'}
                 >
-                  <span style={{ fontSize: '1.1rem' }}>♾️</span>
+                  <IconInfinity size={18} />
                   <span>Permanently</span>
                   <span className="duration-caption">
                     {currentUser?.role === 'admin' ? 'Admin only' : 'Locked for subadmin'}
@@ -2775,7 +2878,7 @@ export default function DashboardPage() {
                   className={`mac-auth-duration-btn ${macAuthDisableMode === '1hour' ? 'active' : ''}`}
                   onClick={() => setMacAuthDisableMode('1hour')}
                 >
-                  <span style={{ fontSize: '1.1rem' }}>⏱️</span>
+                  <IconClock size={18} />
                   <span>1 Hour</span>
                   <span className="duration-caption">Quick bypass</span>
                 </button>
@@ -2785,7 +2888,7 @@ export default function DashboardPage() {
                   className={`mac-auth-duration-btn ${macAuthDisableMode === '1day' ? 'active' : ''}`}
                   onClick={() => setMacAuthDisableMode('1day')}
                 >
-                  <span style={{ fontSize: '1.1rem' }}>📅</span>
+                  <IconCalendar size={18} />
                   <span>24 Hours</span>
                   <span className="duration-caption">1 day</span>
                 </button>
@@ -2795,7 +2898,7 @@ export default function DashboardPage() {
                   className={`mac-auth-duration-btn ${macAuthDisableMode === '7days' ? 'active' : ''}`}
                   onClick={() => setMacAuthDisableMode('7days')}
                 >
-                  <span style={{ fontSize: '1.1rem' }}>🗓️</span>
+                  <IconCalendar size={18} />
                   <span>7 Days</span>
                   <span className="duration-caption">1 week</span>
                 </button>
@@ -2805,7 +2908,7 @@ export default function DashboardPage() {
                   className={`mac-auth-duration-btn ${macAuthDisableMode === '30days' ? 'active' : ''}`}
                   onClick={() => setMacAuthDisableMode('30days')}
                 >
-                  <span style={{ fontSize: '1.1rem' }}>📆</span>
+                  <IconCalendar size={18} />
                   <span>30 Days</span>
                   <span className="duration-caption">Max subadmin limit</span>
                 </button>
@@ -2815,7 +2918,7 @@ export default function DashboardPage() {
                   className={`mac-auth-duration-btn ${macAuthDisableMode === 'custom' ? 'active' : ''}`}
                   onClick={() => setMacAuthDisableMode('custom')}
                 >
-                  <span style={{ fontSize: '1.1rem' }}>📅</span>
+                  <IconCalendar size={18} />
                   <span>Pick Date</span>
                   <span className="duration-caption">Calendar</span>
                 </button>
@@ -2832,10 +2935,16 @@ export default function DashboardPage() {
                   className="form-input-element"
                   value={customMacAuthDate}
                   onChange={(e) => setCustomMacAuthDate(e.target.value)}
-                  min={new Date(Date.now() + 60000).toISOString().slice(0, 16)}
+                  min={(() => {
+                    const now = new Date(Date.now() + 60000);
+                    return new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+                  })()}
                   max={
                     currentUser?.role === 'subadmin'
-                      ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 16)
+                      ? (() => {
+                          const maxDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+                          return new Date(maxDate.getTime() - maxDate.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+                        })()
                       : undefined
                   }
                   style={{ fontSize: '0.84rem' }}
@@ -2878,20 +2987,23 @@ export default function DashboardPage() {
           <div className="conflict-modal-card">
             <div className="modal-header-row">
               <h3 className="modal-headline" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <span>⚠️</span>
+                <IconAlertTriangle size={18} />
                 <span>Warning: Multi-Group Conflict</span>
               </h3>
               <button
                 onClick={() => setConflictModalData(null)}
                 className="modal-close-icon"
                 disabled={isResolvingConflict}
+                aria-label="Close"
               >
-                ✕
+                <IconClose size={13} />
               </button>
             </div>
 
             <div className="conflict-warning-box">
-              <div className="conflict-warning-icon">⚠️</div>
+              <div className="conflict-warning-icon" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <IconAlertTriangle size={22} />
+              </div>
               <div style={{ fontSize: '0.84rem', lineHeight: 1.5, color: 'var(--text-primary)' }}>
                 <strong>Policy Violation:</strong> No user can be a member of a &quot;No Internet&quot; group and another group that has internet access.
                 <div style={{ marginTop: '0.35rem', color: 'var(--text-secondary)' }}>

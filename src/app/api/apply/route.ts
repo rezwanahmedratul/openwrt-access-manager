@@ -106,7 +106,8 @@ export async function POST() {
         is_no_internet: Boolean(u.user_groups?.some((ug: any) => ug.groups?.is_no_internet)),
       }));
 
-      const firewallContent = generateFirewallConfig(finalUsers);
+      const state = getMockState();
+      const firewallContent = generateFirewallConfig(finalUsers, state.mockMacAuth.enabled);
       const ethersContent = generateEthersConfig(finalUsers);
       const hash = computeConfigHash(firewallContent, ethersContent);
 

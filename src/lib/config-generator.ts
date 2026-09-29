@@ -156,18 +156,18 @@ export function generateFirewallConfig(users: UserConfigInput[], macAuthEnabled:
 
   let config = FIREWALL_BASE_TEMPLATE;
 
-  // Allowed internet access rule
-  config += `\n\nconfig rule\n\toption src 'lan'\n\toption dest 'wan'\n\toption name 'Allow Internet Access'\n\toption target 'ACCEPT'\n\toption enabled '1'\n\tlist proto 'all'`;
-  for (const user of sortedAllowed) {
-    config += `\n\tlist src_mac '${user.mac_address}'`;
-  }
-
-  // Blocked internet access rule (only if there are users with no-internet tag)
+  // Blocked internet access rule (evaluated first: explicit DROP takes priority)
   if (sortedBlocked.length > 0) {
     config += `\n\nconfig rule\n\toption src 'lan'\n\toption dest 'wan'\n\toption name 'Block Internet'\n\toption target 'DROP'\n\toption enabled '1'\n\tlist proto 'all'`;
     for (const user of sortedBlocked) {
       config += `\n\tlist src_mac '${user.mac_address}'`;
     }
+  }
+
+  // Allowed internet access rule
+  config += `\n\nconfig rule\n\toption src 'lan'\n\toption dest 'wan'\n\toption name 'Allow Internet Access'\n\toption target 'ACCEPT'\n\toption enabled '1'\n\tlist proto 'all'`;
+  for (const user of sortedAllowed) {
+    config += `\n\tlist src_mac '${user.mac_address}'`;
   }
 
   // Exactly one forwarding block: 'unspecified' when MAC auth is on, 'wan' when MAC auth is off
