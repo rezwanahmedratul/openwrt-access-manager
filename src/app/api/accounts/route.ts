@@ -3,11 +3,23 @@ import { getSessionFromRequest } from '@/lib/auth';
 import { getMockState } from '@/lib/mock-store';
 import { getServiceSupabase } from '@/lib/supabase';
 import { Account } from '@/lib/types';
+import { cacheGet, cacheSet, cacheDelPrefix } from '@/lib/cache';
+
+const ACCOUNTS_CACHE_KEY = 'cache:accounts:list';
 
 export async function GET(request: Request) {
   const session = getSessionFromRequest(request);
   if (!session || session.role !== 'admin') {
     return NextResponse.json({ error: 'Unauthorized: Only administrators can view accounts' }, { status: 403 });
+  }
+
+  // Check cache first
+  const cached = await cacheGet<Account[]>(ACCOUNTS_CACHE_KEY);
+  if (cached) {
+    return NextResponse.json(
+      { accounts: cached },
+      { headers: { 'X-Cache': 'HIT', 'Cache-Control': 'private, no-cache' } }
+    );
   }
 
   const isSupabaseConfigured = Boolean(
@@ -23,7 +35,12 @@ export async function GET(request: Request) {
         .order('created_at', { ascending: true });
 
       if (error) throw error;
-      return NextResponse.json({ accounts: data || [] });
+      const accounts = data || [];
+      await cacheSet(ACCOUNTS_CACHE_KEY, accounts, 60);
+      return NextResponse.json(
+        { accounts },
+        { headers: { 'X-Cache': 'MISS', 'Cache-Control': 'private, no-cache' } }
+      );
     } catch (e) {
       console.error('Supabase query accounts error, falling back to mock:', e);
     }
@@ -38,7 +55,11 @@ export async function GET(request: Request) {
     updated_at: a.updated_at,
   }));
 
-  return NextResponse.json({ accounts });
+  await cacheSet(ACCOUNTS_CACHE_KEY, accounts, 60);
+  return NextResponse.json(
+    { accounts },
+    { headers: { 'X-Cache': 'MISS', 'Cache-Control': 'private, no-cache' } }
+  );
 }
 
 export async function POST(request: Request) {
@@ -93,6 +114,7 @@ export async function POST(request: Request) {
           .single();
 
         if (error) throw error;
+        await cacheDelPrefix('cache:accounts:');
         return NextResponse.json({ success: true, account: newAccount });
       } catch (e) {
         console.error('Supabase create account error, falling back to mock:', e);
@@ -115,6 +137,7 @@ export async function POST(request: Request) {
     };
 
     state.setMockAccounts([...state.mockAccounts, newAccount]);
+    await cacheDelPrefix('cache:accounts:');
 
     return NextResponse.json({
       success: true,
@@ -164,6 +187,7 @@ export async function DELETE(request: Request) {
           return NextResponse.json({ error: 'Cannot delete administrator account' }, { status: 400 });
         }
         await supabase.from('accounts').delete().eq('id', accountId);
+        await cacheDelPrefix('cache:accounts:');
         return NextResponse.json({ success: true, message: 'Subadmin account deleted successfully' });
       } catch (e) {
         console.error('Supabase delete account error, falling back to mock:', e);
@@ -171,6 +195,7 @@ export async function DELETE(request: Request) {
     }
 
     state.setMockAccounts(state.mockAccounts.filter((a) => a.id !== accountId));
+    await cacheDelPrefix('cache:accounts:');
     return NextResponse.json({ success: true, message: 'Subadmin account deleted successfully' });
   } catch (err: any) {
     return NextResponse.json({ error: err.message || 'Failed to delete account' }, { status: 500 });

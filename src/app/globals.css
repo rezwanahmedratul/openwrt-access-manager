@@ -2597,6 +2597,27 @@ body {
   margin-top: 0.5rem;
 }
 
+/* High-Performance Rendering & CPU Reductions */
+.data-table tbody tr {
+  contain: layout style;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 54px;
+}
+
+.user-dropdown-popover,
+.modal-backdrop,
+.floating-pending-bar,
+.toast-notice {
+  will-change: transform, opacity;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+.table-card-container {
+  contain: layout style paint;
+}
+
+
 
 
 

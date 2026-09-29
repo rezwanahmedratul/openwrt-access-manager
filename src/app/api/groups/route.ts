@@ -3,9 +3,27 @@ import { getServiceSupabase } from '@/lib/supabase';
 import { getMockState } from '@/lib/mock-store';
 import { Group } from '@/lib/types';
 import { getSessionFromRequest } from '@/lib/auth';
+import { cacheGet, cacheSet, cacheDelPrefix } from '@/lib/cache';
+
+const GROUPS_CACHE_KEY = 'cache:groups:list';
+
+async function invalidateGroupsAndUsersCache() {
+  await Promise.all([
+    cacheDelPrefix('cache:groups:'),
+    cacheDelPrefix('cache:users:'),
+  ]);
+}
 
 // GET all groups
 export async function GET() {
+  const cached = await cacheGet<Group[]>(GROUPS_CACHE_KEY);
+  if (cached) {
+    return NextResponse.json(
+      { groups: cached },
+      { headers: { 'X-Cache': 'HIT', 'Cache-Control': 'private, no-cache' } }
+    );
+  }
+
   const supabase = getServiceSupabase();
   const isSupabaseConfigured = Boolean(
     process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_URL.startsWith('http')
@@ -16,10 +34,19 @@ export async function GET() {
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
-    return NextResponse.json({ groups: data || [] });
+    const groups = data || [];
+    await cacheSet(GROUPS_CACHE_KEY, groups, 60);
+    return NextResponse.json(
+      { groups },
+      { headers: { 'X-Cache': 'MISS', 'Cache-Control': 'private, no-cache' } }
+    );
   } else {
     const state = getMockState();
-    return NextResponse.json({ groups: state.mockGroups });
+    await cacheSet(GROUPS_CACHE_KEY, state.mockGroups, 60);
+    return NextResponse.json(
+      { groups: state.mockGroups },
+      { headers: { 'X-Cache': 'MISS', 'Cache-Control': 'private, no-cache' } }
+    );
   }
 }
 
@@ -74,6 +101,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: error.message }, { status: 500 });
       }
 
+      await invalidateGroupsAndUsersCache();
       return NextResponse.json({ success: true, group: data });
     } else {
       const state = getMockState();
@@ -94,6 +122,7 @@ export async function POST(request: Request) {
       };
 
       state.setMockGroups([...state.mockGroups, newGroup]);
+      await invalidateGroupsAndUsersCache();
       return NextResponse.json({ success: true, group: newGroup });
     }
   } catch (err: any) {
@@ -183,6 +212,7 @@ export async function DELETE(request: Request) {
         }
       }
 
+      await invalidateGroupsAndUsersCache();
       return NextResponse.json({
         success: true,
         message: `Group deleted. Users successfully reassigned to "${defaultGroup.name}".`,
@@ -247,6 +277,7 @@ export async function DELETE(request: Request) {
       // Remove group from groups list
       state.setMockGroups(state.mockGroups.filter((g) => g.id !== groupId));
 
+      await invalidateGroupsAndUsersCache();
       return NextResponse.json({
         success: true,
         message: `Group deleted. Users successfully reassigned to "${defaultGroup.name}".`,
@@ -412,6 +443,7 @@ export async function PATCH(request: Request) {
         .single();
 
       if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+      await invalidateGroupsAndUsersCache();
       return NextResponse.json({ success: true, group: data });
     } else {
       const state = getMockState();
@@ -543,6 +575,7 @@ export async function PATCH(request: Request) {
           }))
         );
       }
+      await invalidateGroupsAndUsersCache();
       return NextResponse.json({ success: true, group: updatedGroup });
     }
   } catch (err: any) {

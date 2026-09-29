@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServiceSupabase } from '@/lib/supabase';
 import { generateFirewallConfig, generateEthersConfig, computeConfigHash, UserConfigInput } from '@/lib/config-generator';
 import { getMockState } from '@/lib/mock-store';
+import { cacheDelPrefix } from '@/lib/cache';
 
 export async function POST() {
   const supabase = getServiceSupabase();
@@ -141,6 +142,9 @@ export async function POST() {
 
       await supabase.from('draft_changes').delete().neq('id', '00000000-0000-0000-0000-000000000000');
 
+      // Purge all Redis/memory caches so routers and clients receive fresh configuration immediately
+      await cacheDelPrefix('cache:');
+
       return NextResponse.json({
         success: true,
         version: nextVersion,
@@ -219,6 +223,9 @@ export async function POST() {
     state.setMockDraftChanges([]);
     state.setMockVersion(nextVer);
     state.setMockLastApplied(new Date().toISOString());
+
+    // Purge cache
+    await cacheDelPrefix('cache:');
 
     return NextResponse.json({
       success: true,

@@ -5,6 +5,7 @@ import { normalizeName } from '@/lib/normalize-name';
 import { DraftChange } from '@/lib/types';
 import { getMockState } from '@/lib/mock-store';
 import { getSessionFromRequest } from '@/lib/auth';
+import { cacheDelPrefix } from '@/lib/cache';
 
 export async function POST(request: Request) {
   try {
@@ -242,6 +243,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: error.message }, { status: 500 });
       }
 
+      await cacheDelPrefix('cache:users:');
       return NextResponse.json({ success: true, change: data });
     } else {
       const state = getMockState();
@@ -295,6 +297,7 @@ export async function POST(request: Request) {
       };
 
       state.setMockDraftChanges([...state.mockDraftChanges, newChange]);
+      await cacheDelPrefix('cache:users:');
       return NextResponse.json({ success: true, change: newChange });
     }
   } catch (err: any) {
@@ -323,6 +326,7 @@ export async function DELETE(request: Request) {
       }
 
       await supabase.from('draft_changes').delete().eq('id', latestChange.id);
+      await cacheDelPrefix('cache:users:');
       return NextResponse.json({ success: true, undone_id: latestChange.id });
     } else {
       const state = getMockState();
@@ -332,16 +336,19 @@ export async function DELETE(request: Request) {
       const updated = [...state.mockDraftChanges];
       const removed = updated.pop();
       state.setMockDraftChanges(updated);
+      await cacheDelPrefix('cache:users:');
       return NextResponse.json({ success: true, undone_id: removed?.id });
     }
   }
 
   if (isSupabaseConfigured) {
     await supabase.from('draft_changes').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+    await cacheDelPrefix('cache:users:');
     return NextResponse.json({ success: true, message: 'All draft changes discarded' });
   } else {
     const state = getMockState();
     state.setMockDraftChanges([]);
+    await cacheDelPrefix('cache:users:');
     return NextResponse.json({ success: true, message: 'All draft changes discarded' });
   }
 }

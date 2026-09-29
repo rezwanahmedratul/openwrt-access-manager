@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server';
 import { getServiceSupabase } from '@/lib/supabase';
 import { getMockState } from '@/lib/mock-store';
 import { generateFirewallConfig, generateEthersConfig, computeConfigHash, UserConfigInput } from '@/lib/config-generator';
+import { cacheGet, cacheSet } from '@/lib/cache';
+
+const CONFIG_VERSION_CACHE_KEY = 'cache:config:version';
 
 function authenticateRouter(request: Request): boolean {
   const authHeader = request.headers.get('authorization') || '';
@@ -15,8 +18,21 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Unauthorized: Invalid router credentials' }, { status: 401 });
   }
 
+  // Check cache first for instant sub-millisecond response
+  const cached = await cacheGet<{ version: number; hash: string; created_at: string }>(CONFIG_VERSION_CACHE_KEY);
+  if (cached) {
+    return NextResponse.json(cached, {
+      headers: {
+        'X-Cache': 'HIT',
+        'Cache-Control': 'no-cache',
+      },
+    });
+  }
+
   const supabase = getServiceSupabase();
-  const isSupabaseConfigured = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_URL.startsWith('http'));
+  const isSupabaseConfigured = Boolean(
+    process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_URL.startsWith('http')
+  );
 
   if (isSupabaseConfigured) {
     const { data: config, error } = await supabase
@@ -29,10 +45,19 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'No published configuration found' }, { status: 404 });
     }
 
-    return NextResponse.json({
+    const payload = {
       version: config.version,
       hash: config.hash,
       created_at: config.created_at,
+    };
+
+    await cacheSet(CONFIG_VERSION_CACHE_KEY, payload, 300);
+
+    return NextResponse.json(payload, {
+      headers: {
+        'X-Cache': 'MISS',
+        'Cache-Control': 'no-cache',
+      },
     });
   } else {
     const state = getMockState();
@@ -48,10 +73,19 @@ export async function GET(request: Request) {
     const ethers = generateEthersConfig(state.mockUsers);
     const hash = computeConfigHash(firewall, ethers);
 
-    return NextResponse.json({
+    const payload = {
       version: state.mockVersion,
       hash,
       created_at: state.mockLastApplied,
+    };
+
+    await cacheSet(CONFIG_VERSION_CACHE_KEY, payload, 300);
+
+    return NextResponse.json(payload, {
+      headers: {
+        'X-Cache': 'MISS',
+        'Cache-Control': 'no-cache',
+      },
     });
   }
 }

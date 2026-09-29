@@ -1,6 +1,9 @@
 import { getServiceSupabase } from '@/lib/supabase';
 import { generateFirewallConfig } from '@/lib/config-generator';
 import { getMockState } from '@/lib/mock-store';
+import { cacheGet, cacheSet } from '@/lib/cache';
+
+const FIREWALL_CACHE_KEY = 'cache:config:firewall';
 
 function authenticateRouter(request: Request): boolean {
   const authHeader = request.headers.get('authorization') || '';
@@ -17,8 +20,24 @@ export async function GET(request: Request) {
     return new Response('Unauthorized: Invalid router credentials', { status: 401 });
   }
 
+  // Check cache first
+  const cachedContent = await cacheGet<string>(FIREWALL_CACHE_KEY);
+  if (cachedContent !== null) {
+    return new Response(cachedContent, {
+      status: 200,
+      headers: {
+        'Content-Type': 'text/plain; charset=utf-8',
+        'Content-Disposition': 'inline; filename="firewall"',
+        'X-Cache': 'HIT',
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+      },
+    });
+  }
+
   const supabase = getServiceSupabase();
-  const isSupabaseConfigured = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_URL.startsWith('http'));
+  const isSupabaseConfigured = Boolean(
+    process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_URL.startsWith('http')
+  );
 
   let content = '';
 
@@ -56,11 +75,15 @@ export async function GET(request: Request) {
     content = generateFirewallConfig(mapped, state.mockMacAuth.enabled);
   }
 
+  // Store in Redis / memory cache
+  await cacheSet(FIREWALL_CACHE_KEY, content, 300);
+
   return new Response(content, {
     status: 200,
     headers: {
       'Content-Type': 'text/plain; charset=utf-8',
       'Content-Disposition': 'inline; filename="firewall"',
+      'X-Cache': 'MISS',
       'Cache-Control': 'no-cache, no-store, must-revalidate',
     },
   });

@@ -3,95 +3,132 @@ import { getServiceSupabase } from '@/lib/supabase';
 import { UserWithGroups, Group, DraftChange, UserViewModel } from '@/lib/types';
 import { normalizeMac } from '@/lib/normalize-mac';
 import { getMockState } from '@/lib/mock-store';
+import { cacheGet, cacheSet } from '@/lib/cache';
+
+const USERS_CACHE_KEY = 'cache:users:raw';
+const USERS_CACHE_TTL = 30; // 30 seconds TTL, invalidated on mutations
+
+interface RawUsersData {
+  appliedUsers: UserWithGroups[];
+  groups: Group[];
+  draftChanges: DraftChange[];
+  currentVersion: number | null;
+  lastApplied: string | null;
+}
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const search = searchParams.get('search') || '';
   const groupFilter = searchParams.get('group') || '';
 
-  const supabase = getServiceSupabase();
-  const isSupabaseConfigured = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_URL.startsWith('http'));
-
   const mock = getMockState();
-  let appliedUsers: UserWithGroups[] = [];
-  let groups: Group[] = [];
-  let draftChanges: DraftChange[] = [];
-  let currentVersion: number | null = null;
-  let lastApplied: string | null = null;
+  let rawData: RawUsersData | null = null;
+  let cacheHit = false;
 
-  if (isSupabaseConfigured) {
-    try {
-      const [
-        { data: groupData },
-        { data: userData },
-        { data: changesData },
-        { data: configData },
-      ] = await Promise.all([
-        supabase.from('groups').select('*').order('name'),
-        supabase
-          .from('users')
-          .select(`
-            id, name, mac_address, created_at, updated_at,
-            user_groups (
-              group_id,
-              groups ( id, name, is_protected, is_no_internet, created_at, updated_at )
-            )
-          `)
-          .order('name'),
-        supabase
-          .from('draft_changes')
-          .select('*')
-          .order('sequence', { ascending: true }),
-        supabase
-          .from('configurations')
-          .select('version, created_at')
-          .eq('is_current', true)
-          .maybeSingle(),
-      ]);
+  // Try Redis / Memory Cache first
+  rawData = await cacheGet<RawUsersData>(USERS_CACHE_KEY);
+  if (rawData) {
+    cacheHit = true;
+  } else {
+    const supabase = getServiceSupabase();
+    const isSupabaseConfigured = Boolean(
+      process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_URL.startsWith('http')
+    );
 
-      groups = groupData || [];
+    let appliedUsers: UserWithGroups[] = [];
+    let groups: Group[] = [];
+    let draftChanges: DraftChange[] = [];
+    let currentVersion: number | null = null;
+    let lastApplied: string | null = null;
 
-      if (userData) {
-        appliedUsers = userData.map((u: any) => ({
-          id: u.id,
-          name: u.name,
-          mac_address: u.mac_address,
-          created_at: u.created_at,
-          updated_at: u.updated_at,
-          groups: u.user_groups?.map((ug: any) => ug.groups).filter(Boolean) || [],
-        }));
+    if (isSupabaseConfigured) {
+      try {
+        const [
+          { data: groupData },
+          { data: userData },
+          { data: changesData },
+          { data: configData },
+        ] = await Promise.all([
+          supabase.from('groups').select('*').order('name'),
+          supabase
+            .from('users')
+            .select(`
+              id, name, mac_address, created_at, updated_at,
+              user_groups (
+                group_id,
+                groups ( id, name, is_protected, is_no_internet, created_at, updated_at )
+              )
+            `)
+            .order('name'),
+          supabase
+            .from('draft_changes')
+            .select('*')
+            .order('sequence', { ascending: true }),
+          supabase
+            .from('configurations')
+            .select('version, created_at')
+            .eq('is_current', true)
+            .maybeSingle(),
+        ]);
+
+        groups = groupData || [];
+
+        if (userData) {
+          appliedUsers = userData.map((u: any) => ({
+            id: u.id,
+            name: u.name,
+            mac_address: u.mac_address,
+            created_at: u.created_at,
+            updated_at: u.updated_at,
+            groups: u.user_groups?.map((ug: any) => ug.groups).filter(Boolean) || [],
+          }));
+        }
+
+        draftChanges = changesData || [];
+
+        if (configData) {
+          currentVersion = configData.version;
+          lastApplied = configData.created_at;
+        }
+      } catch (e) {
+        console.error('Supabase query error, falling back to mock:', e);
+        appliedUsers = mock.mockUsers;
+        groups = mock.mockGroups;
+        draftChanges = mock.mockDraftChanges;
+        currentVersion = mock.mockVersion;
+        lastApplied = mock.mockLastApplied;
       }
-
-      draftChanges = changesData || [];
-
-      if (configData) {
-        currentVersion = configData.version;
-        lastApplied = configData.created_at;
-      }
-    } catch (e) {
-      console.error('Supabase query error, falling back to mock:', e);
-      appliedUsers = mock.mockUsers;
+    } else {
+      appliedUsers = mock.mockUsers.map((u) => ({
+        ...u,
+        groups: u.groups.map((ug) => mock.mockGroups.find((mg) => mg.id === ug.id) || ug),
+      }));
       groups = mock.mockGroups;
       draftChanges = mock.mockDraftChanges;
       currentVersion = mock.mockVersion;
       lastApplied = mock.mockLastApplied;
     }
-  } else {
-    appliedUsers = mock.mockUsers.map((u) => ({
-      ...u,
-      groups: u.groups.map((ug) => mock.mockGroups.find((mg) => mg.id === ug.id) || ug),
-    }));
-    groups = mock.mockGroups;
-    draftChanges = mock.mockDraftChanges;
-    currentVersion = mock.mockVersion;
-    lastApplied = mock.mockLastApplied;
+
+    rawData = {
+      appliedUsers,
+      groups,
+      draftChanges,
+      currentVersion,
+      lastApplied,
+    };
+
+    // Store in cache asynchronously
+    await cacheSet(USERS_CACHE_KEY, rawData, USERS_CACHE_TTL);
   }
+
+  const { appliedUsers, groups, draftChanges, currentVersion, lastApplied } = rawData;
 
   // Ensure Default group always exists
   let defaultGroup = groups.find((g) => g.name.toLowerCase() === 'default');
+  let finalGroups = groups;
   if (!defaultGroup) {
     defaultGroup = { id: 'g-default', name: 'Default', is_protected: false, created_at: '', updated_at: '' };
-    groups = [defaultGroup, ...groups];
+    finalGroups = [defaultGroup, ...groups];
   }
 
   const viewMap = new Map<string, UserViewModel>();
@@ -110,7 +147,7 @@ export async function GET(request: Request) {
   for (const change of draftChanges) {
     if (change.operation === 'ADD') {
       const tempId = `draft-add-${change.id}`;
-      const changeGroups = groups.filter((g) => change.user_data?.group_ids?.includes(g.id));
+      const changeGroups = finalGroups.filter((g) => change.user_data?.group_ids?.includes(g.id));
       const finalChangeGroups = changeGroups.length > 0 ? changeGroups : [defaultGroup];
       viewMap.set(tempId, {
         id: tempId,
@@ -123,7 +160,7 @@ export async function GET(request: Request) {
     } else if (change.operation === 'MODIFY' && change.user_id) {
       const existing = viewMap.get(change.user_id);
       if (existing) {
-        const changeGroups = groups.filter((g) => change.user_data?.group_ids?.includes(g.id));
+        const changeGroups = finalGroups.filter((g) => change.user_data?.group_ids?.includes(g.id));
         const finalChangeGroups = changeGroups.length > 0 ? changeGroups : [defaultGroup];
         viewMap.set(change.user_id, {
           ...existing,
@@ -168,17 +205,25 @@ export async function GET(request: Request) {
     finalUsers = finalUsers.filter((u) => u.groups.some((g) => g.id === groupFilter || g.name.toLowerCase() === groupFilter.toLowerCase()));
   }
 
-  return NextResponse.json({
-    users: finalUsers,
-    groups,
-    stats: {
-      total_users: appliedUsers.length,
-      total_groups: groups.length,
-      pending_changes: draftChanges.length,
-      current_version: currentVersion,
-      last_applied: lastApplied,
-      mac_auth: mock.mockMacAuth,
+  return NextResponse.json(
+    {
+      users: finalUsers,
+      groups: finalGroups,
+      stats: {
+        total_users: appliedUsers.length,
+        total_groups: finalGroups.length,
+        pending_changes: draftChanges.length,
+        current_version: currentVersion,
+        last_applied: lastApplied,
+        mac_auth: mock.mockMacAuth,
+      },
+      draft_changes: draftChanges,
     },
-    draft_changes: draftChanges,
-  });
+    {
+      headers: {
+        'X-Cache': cacheHit ? 'HIT' : 'MISS',
+        'Cache-Control': 'private, no-cache, no-transform',
+      },
+    }
+  );
 }

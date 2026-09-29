@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { UserViewModel, Group, DashboardStats, SessionUser } from '@/lib/types';
 import { normalizeMac } from '@/lib/normalize-mac';
 import { normalizeName } from '@/lib/normalize-name';
@@ -114,8 +114,33 @@ export default function DashboardPage() {
     last_applied: null,
   });
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [selectedGroup, setSelectedGroup] = useState('ALL');
   const [loading, setLoading] = useState(true);
+
+  // Debounce search by 200ms to reduce CPU and network overhead
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(search);
+    }, 200);
+    return () => clearTimeout(handler);
+  }, [search]);
+
+  // Instant zero-latency client-side search filtering
+  const displayedUsers = useMemo(() => {
+    if (!search.trim()) return users;
+    const q = search.trim().toLowerCase();
+    const cleanQ = q.replace(/[:\-]/g, '');
+    return users.filter((u) => {
+      const nameMatch = u.name.toLowerCase().includes(q);
+      const macMatch = u.mac_address.toLowerCase().replace(/[:\-]/g, '').includes(cleanQ);
+      return nameMatch || macMatch;
+    });
+  }, [users, search]);
+
+  // Redis / In-memory Cache Diagnostics state
+  const [cacheInfo, setCacheInfo] = useState<{ engine: string; connected: boolean; keysCount: number; pingMs: number } | null>(null);
+  const [isPurgingCache, setIsPurgingCache] = useState(false);
 
   // Theme Management (Light / Dark Mode)
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
@@ -509,10 +534,35 @@ export default function DashboardPage() {
     }
   };
 
-  const fetchData = async () => {
+  const fetchCacheStatus = async () => {
+    try {
+      const res = await fetch('/api/system/status');
+      const data = await res.json();
+      if (data.cache) setCacheInfo(data.cache);
+    } catch {
+      // ignore
+    }
+  };
+
+  const handlePurgeCache = async () => {
+    try {
+      setIsPurgingCache(true);
+      const res = await fetch('/api/system/status', { method: 'POST' });
+      const data = await res.json();
+      if (data.cache) setCacheInfo(data.cache);
+      showToast('Redis in-memory cache successfully purged!');
+      await fetchData(debouncedSearch, selectedGroup);
+    } catch {
+      showToast('Failed to purge cache', 'error');
+    } finally {
+      setIsPurgingCache(false);
+    }
+  };
+
+  const fetchData = async (searchQuery = debouncedSearch, groupFilter = selectedGroup) => {
     try {
       setLoading(true);
-      const res = await fetch(`/api/users?search=${encodeURIComponent(search)}&group=${encodeURIComponent(selectedGroup)}`);
+      const res = await fetch(`/api/users?search=${encodeURIComponent(searchQuery)}&group=${encodeURIComponent(groupFilter)}`);
       const data = await res.json();
       if (data.users) setUsers(data.users);
       if (data.groups) {
@@ -531,14 +581,26 @@ export default function DashboardPage() {
     }
   };
 
+  // Debounced users fetch: prevents spamming requests on every keystroke
   useEffect(() => {
     if (currentUser) {
-      fetchData();
-      if (currentUser.role === 'admin') {
-        fetchAccounts();
-      }
+      fetchData(debouncedSearch, selectedGroup);
     }
-  }, [search, selectedGroup, currentUser]);
+  }, [debouncedSearch, selectedGroup, currentUser]);
+
+  // Decoupled: fetch accounts only when admin is on accounts tab
+  useEffect(() => {
+    if (currentUser && currentUser.role === 'admin' && activeTab === 'account') {
+      fetchAccounts();
+    }
+  }, [currentUser, activeTab]);
+
+  // Fetch cache status when Settings tab is active
+  useEffect(() => {
+    if (currentUser && activeTab === 'settings') {
+      fetchCacheStatus();
+    }
+  }, [currentUser, activeTab]);
 
   // Handle Edit User Save (from Edit Modal)
   const handleSaveUser = async (e: React.FormEvent) => {
@@ -721,8 +783,8 @@ export default function DashboardPage() {
       const finalGroupIds = addSelectedGroup
         ? [addSelectedGroup]
         : defaultGroup
-        ? [defaultGroup.id]
-        : [];
+          ? [defaultGroup.id]
+          : [];
 
       const payload = {
         operation: 'ADD',
@@ -1189,7 +1251,7 @@ export default function DashboardPage() {
               >
                 <span className="nav-icon">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/>
+                    <path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z" />
                   </svg>
                 </span>
                 <span className="nav-label-text">Dashboard</span>
@@ -1202,10 +1264,10 @@ export default function DashboardPage() {
               >
                 <span className="nav-icon">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-                    <circle cx="9" cy="7" r="4"/>
-                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-                    <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                    <circle cx="9" cy="7" r="4" />
+                    <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
                   </svg>
                 </span>
                 <span className="nav-label-text">Groups</span>
@@ -1218,8 +1280,8 @@ export default function DashboardPage() {
               >
                 <span className="nav-icon">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-                    <circle cx="12" cy="7" r="4"/>
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                    <circle cx="12" cy="7" r="4" />
                   </svg>
                 </span>
                 <span className="nav-label-text">Account</span>
@@ -1232,8 +1294,8 @@ export default function DashboardPage() {
               >
                 <span className="nav-icon">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <circle cx="12" cy="12" r="3"/>
-                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                    <circle cx="12" cy="12" r="3" />
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
                   </svg>
                 </span>
                 <span className="nav-label-text">Settings</span>
@@ -1299,15 +1361,15 @@ export default function DashboardPage() {
                 aria-label="Light Mode"
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <circle cx="12" cy="12" r="5"/>
-                  <line x1="12" y1="1" x2="12" y2="3"/>
-                  <line x1="12" y1="21" x2="12" y2="23"/>
-                  <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
-                  <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
-                  <line x1="1" y1="12" x2="3" y2="12"/>
-                  <line x1="21" y1="12" x2="23" y2="12"/>
-                  <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
-                  <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+                  <circle cx="12" cy="12" r="5" />
+                  <line x1="12" y1="1" x2="12" y2="3" />
+                  <line x1="12" y1="21" x2="12" y2="23" />
+                  <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+                  <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+                  <line x1="1" y1="12" x2="3" y2="12" />
+                  <line x1="21" y1="12" x2="23" y2="12" />
+                  <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+                  <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
                 </svg>
               </button>
               <button
@@ -1318,7 +1380,7 @@ export default function DashboardPage() {
                 aria-label="Dark Mode"
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+                  <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
                 </svg>
               </button>
             </div>
@@ -1334,8 +1396,8 @@ export default function DashboardPage() {
                 aria-expanded={showUserDropdown}
               >
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-                  <circle cx="12" cy="7" r="4"/>
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                  <circle cx="12" cy="7" r="4" />
                 </svg>
               </button>
 
@@ -1369,8 +1431,8 @@ export default function DashboardPage() {
                       }}
                     >
                       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-                        <circle cx="12" cy="7" r="4"/>
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                        <circle cx="12" cy="7" r="4" />
                       </svg>
                       <span>Account Management</span>
                     </button>
@@ -1384,8 +1446,8 @@ export default function DashboardPage() {
                       }}
                     >
                       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <circle cx="12" cy="12" r="3"/>
-                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                        <circle cx="12" cy="12" r="3" />
+                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
                       </svg>
                       <span>Gateway Settings</span>
                     </button>
@@ -1401,9 +1463,9 @@ export default function DashboardPage() {
                       }}
                     >
                       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-                        <polyline points="16 17 21 12 16 7"/>
-                        <line x1="21" y1="12" x2="9" y2="12"/>
+                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                        <polyline points="16 17 21 12 16 7" />
+                        <line x1="21" y1="12" x2="9" y2="12" />
                       </svg>
                       <span>Sign Out</span>
                     </button>
@@ -1487,8 +1549,8 @@ export default function DashboardPage() {
                   <div className="stat-top-row">
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ opacity: 0.7 }}>
-                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-                        <circle cx="9" cy="7" r="4"/>
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                        <circle cx="9" cy="7" r="4" />
                       </svg>
                       <span className="stat-title-label">PUBLISHED USERS</span>
                     </div>
@@ -1507,10 +1569,10 @@ export default function DashboardPage() {
                   <div className="stat-top-row">
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ opacity: 0.7 }}>
-                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-                        <circle cx="9" cy="7" r="4"/>
-                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-                        <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                        <circle cx="9" cy="7" r="4" />
+                        <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
                       </svg>
                       <span className="stat-title-label">GROUPS</span>
                     </div>
@@ -1525,10 +1587,10 @@ export default function DashboardPage() {
                   <div className="stat-top-row">
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ opacity: 0.7 }}>
-                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                        <polyline points="14 2 14 8 20 8"/>
-                        <line x1="16" y1="13" x2="8" y2="13"/>
-                        <line x1="16" y1="17" x2="8" y2="17"/>
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                        <polyline points="14 2 14 8 20 8" />
+                        <line x1="16" y1="13" x2="8" y2="13" />
+                        <line x1="16" y1="17" x2="8" y2="17" />
                       </svg>
                       <span className="stat-title-label">PENDING DRAFT</span>
                     </div>
@@ -1545,8 +1607,8 @@ export default function DashboardPage() {
                   <div className="stat-top-row">
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ opacity: 0.7 }}>
-                        <polyline points="16 18 22 12 16 6"/>
-                        <polyline points="8 6 2 12 8 18"/>
+                        <polyline points="16 18 22 12 16 6" />
+                        <polyline points="8 6 2 12 8 18" />
                       </svg>
                       <span className="stat-title-label">CONFIG VERSION</span>
                     </div>
@@ -1566,8 +1628,8 @@ export default function DashboardPage() {
                 <div className="horizontal-add-header">
                   <div className="horizontal-add-title">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                      <line x1="12" y1="5" x2="12" y2="19"/>
-                      <line x1="5" y1="12" x2="19" y2="12"/>
+                      <line x1="12" y1="5" x2="12" y2="19" />
+                      <line x1="5" y1="12" x2="19" y2="12" />
                     </svg>
                     <span>Quick Register Device</span>
                   </div>
@@ -1607,7 +1669,7 @@ export default function DashboardPage() {
                       ref={nameInputRef}
                       type="text"
                       className="add-bar-name-input"
-                      placeholder="e.g. ratul ahmed or TP-Link-Anik"
+                      placeholder="e.g. ratul ahmed or Rezwan-Ahmed"
                       value={addName}
                       onChange={(e) => {
                         setAddName(e.target.value);
@@ -1651,8 +1713,8 @@ export default function DashboardPage() {
                       disabled={isAdding}
                     >
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                        <line x1="12" y1="5" x2="12" y2="19"/>
-                        <line x1="5" y1="12" x2="19" y2="12"/>
+                        <line x1="12" y1="5" x2="12" y2="19" />
+                        <line x1="5" y1="12" x2="19" y2="12" />
                       </svg>
                       <span>{isAdding ? 'Adding...' : 'Add User'}</span>
                     </button>
@@ -1669,9 +1731,9 @@ export default function DashboardPage() {
                 {addError && (
                   <div className="add-bar-alert-error">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <circle cx="12" cy="12" r="10"/>
-                      <line x1="12" y1="8" x2="12" y2="12"/>
-                      <line x1="12" y1="16" x2="12.01" y2="16"/>
+                      <circle cx="12" cy="12" r="10" />
+                      <line x1="12" y1="8" x2="12" y2="12" />
+                      <line x1="12" y1="16" x2="12.01" y2="16" />
                     </svg>
                     <span>{addError}</span>
                   </div>
@@ -1683,8 +1745,8 @@ export default function DashboardPage() {
                 <div className="search-field-box">
                   <span className="search-icon-symbol">
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <circle cx="11" cy="11" r="8"/>
-                      <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                      <circle cx="11" cy="11" r="8" />
+                      <line x1="21" y1="21" x2="16.65" y2="16.65" />
                     </svg>
                   </span>
                   <input
@@ -1723,14 +1785,14 @@ export default function DashboardPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {users.length === 0 ? (
+                    {displayedUsers.length === 0 ? (
                       <tr>
                         <td colSpan={5} style={{ textAlign: 'center', padding: '3.5rem', color: 'var(--text-secondary)' }}>
                           {loading ? 'Loading users...' : 'No users found.'}
                         </td>
                       </tr>
                     ) : (
-                      users.map((u) => {
+                      displayedUsers.map((u) => {
                         const isNoInternetUser = u.groups?.some((g) => g.is_no_internet);
                         return (
                           <tr key={u.id} style={{ opacity: u.status === 'deleted' ? 0.4 : 1 }}>
@@ -1782,41 +1844,41 @@ export default function DashboardPage() {
                                 )}
                               </div>
                             </td>
-                          <td>
-                            {u.status !== 'deleted' ? (
-                              <div className="table-actions-cell">
-                                {u.groups?.some((g) => g.is_protected) && currentUser.role === 'subadmin' ? (
-                                  <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }} title="User is assigned to a protected group. Only administrators can edit or delete this user.">
-                                    <IconLock size={11} />
-                                    <span>Protected (Admin Only)</span>
-                                  </span>
-                                ) : (
-                                  <>
-                                    <button
-                                      className="btn-text-action"
-                                      onClick={() => openEditModal(u)}
-                                    >
-                                      Edit
-                                    </button>
-                                    <button
-                                      className="btn-text-action"
-                                      onClick={() => handleDeleteUser(u)}
-                                    >
-                                      Delete
-                                    </button>
-                                  </>
-                                )}
-                              </div>
-                            ) : (
-                              <div style={{ textAlign: 'right', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                                Pending Delete
-                              </div>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
+                            <td>
+                              {u.status !== 'deleted' ? (
+                                <div className="table-actions-cell">
+                                  {u.groups?.some((g) => g.is_protected) && currentUser.role === 'subadmin' ? (
+                                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }} title="User is assigned to a protected group. Only administrators can edit or delete this user.">
+                                      <IconLock size={11} />
+                                      <span>Protected (Admin Only)</span>
+                                    </span>
+                                  ) : (
+                                    <>
+                                      <button
+                                        className="btn-text-action"
+                                        onClick={() => openEditModal(u)}
+                                      >
+                                        Edit
+                                      </button>
+                                      <button
+                                        className="btn-text-action"
+                                        onClick={() => handleDeleteUser(u)}
+                                      >
+                                        Delete
+                                      </button>
+                                    </>
+                                  )}
+                                </div>
+                              ) : (
+                                <div style={{ textAlign: 'right', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                  Pending Delete
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -2090,8 +2152,8 @@ export default function DashboardPage() {
                   <div className="horizontal-add-card">
                     <div className="horizontal-add-title" style={{ marginBottom: '0.75rem' }}>
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                        <line x1="12" y1="5" x2="12" y2="19"/>
-                        <line x1="5" y1="12" x2="19" y2="12"/>
+                        <line x1="12" y1="5" x2="12" y2="19" />
+                        <line x1="5" y1="12" x2="19" y2="12" />
                       </svg>
                       <span>Add New Subadmin</span>
                     </div>
@@ -2135,9 +2197,9 @@ export default function DashboardPage() {
                     {subadminError && (
                       <div className="add-bar-alert-error">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <circle cx="12" cy="12" r="10"/>
-                          <line x1="12" y1="8" x2="12" y2="12"/>
-                          <line x1="12" y1="16" x2="12.01" y2="16"/>
+                          <circle cx="12" cy="12" r="10" />
+                          <line x1="12" y1="8" x2="12" y2="12" />
+                          <line x1="12" y1="16" x2="12.01" y2="16" />
                         </svg>
                         <span>{subadminError}</span>
                       </div>
@@ -2192,8 +2254,8 @@ export default function DashboardPage() {
                 <div className="horizontal-add-card" style={{ padding: '1.5rem' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-                      <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                     </svg>
                     <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700 }}>Subadmin Privileges Notice</h3>
                   </div>
@@ -2244,8 +2306,8 @@ export default function DashboardPage() {
                 <div className="mac-auth-banner-left">
                   <div className="mac-auth-banner-icon">
                     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-                      <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                     </svg>
                   </div>
                   <div>
@@ -2310,10 +2372,10 @@ export default function DashboardPage() {
                   <div className="settings-section-title-wrap">
                     <h2 className="settings-section-title">
                       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <rect x="2" y="2" width="20" height="8" rx="2" ry="2"/>
-                        <rect x="2" y="14" width="20" height="8" rx="2" ry="2"/>
-                        <line x1="6" y1="6" x2="6.01" y2="6"/>
-                        <line x1="6" y1="18" x2="6.01" y2="18"/>
+                        <rect x="2" y="2" width="20" height="8" rx="2" ry="2" />
+                        <rect x="2" y="14" width="20" height="8" rx="2" ry="2" />
+                        <line x1="6" y1="6" x2="6.01" y2="6" />
+                        <line x1="6" y1="18" x2="6.01" y2="18" />
                       </svg>
                       Router Gateway &amp; Polling
                     </h2>
@@ -2408,7 +2470,7 @@ export default function DashboardPage() {
                   <div className="settings-section-title-wrap">
                     <h2 className="settings-section-title">
                       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
                       </svg>
                       Firewall &amp; Access Control Policies
                     </h2>
@@ -2501,8 +2563,8 @@ export default function DashboardPage() {
                   <div className="settings-section-title-wrap">
                     <h2 className="settings-section-title">
                       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <polyline points="16 18 22 12 16 6"/>
-                        <polyline points="8 6 2 12 8 18"/>
+                        <polyline points="16 18 22 12 16 6" />
+                        <polyline points="8 6 2 12 8 18" />
                       </svg>
                       Router API Endpoints &amp; Authentication
                     </h2>
@@ -2623,21 +2685,94 @@ export default function DashboardPage() {
                 </div>
               </div>
 
+              {/* SECTION: Redis In-Memory Caching & Performance Engine */}
+              <div className="settings-section-card">
+                <div className="settings-section-header">
+                  <div className="settings-section-title-wrap">
+                    <h2 className="settings-section-title">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+                      </svg>
+                      Redis Caching Engine &amp; Performance
+                    </h2>
+                    <p className="settings-section-desc">
+                      High-performance in-memory cache accelerating router cron polling and API queries to sub-millisecond speeds.
+                    </p>
+                  </div>
+                  {currentUser?.role === 'admin' && (
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      disabled={isPurgingCache}
+                      onClick={handlePurgeCache}
+                      style={{ fontSize: '0.8rem', padding: '0.45rem 0.85rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+                    >
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <polyline points="1 4 1 10 7 10"/>
+                        <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
+                      </svg>
+                      <span>{isPurgingCache ? 'Purging...' : 'Purge Cache'}</span>
+                    </button>
+                  )}
+                </div>
+
+                <div className="settings-rows-list">
+                  <div className="settings-row-item">
+                    <div className="settings-row-info">
+                      <span className="settings-row-label">Cache Engine Status</span>
+                      <span className="settings-row-caption">State of the in-memory key-value caching daemon.</span>
+                    </div>
+                    <div className="settings-row-control">
+                      <div className="gateway-pill" style={{ margin: 0 }}>
+                        <span className="gateway-pill-dot" style={{ backgroundColor: cacheInfo?.connected ? '#22c55e' : '#eab308' }}></span>
+                        <span style={{ fontWeight: 600 }}>
+                          {cacheInfo?.engine === 'redis' ? 'Redis 7.0 (Active & Connected)' : 'In-Memory Cache (Active)'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="settings-row-item">
+                    <div className="settings-row-info">
+                      <span className="settings-row-label">Memory Read Latency</span>
+                      <span className="settings-row-caption">Time required to retrieve cached configuration payloads.</span>
+                    </div>
+                    <div className="settings-row-control">
+                      <span style={{ fontSize: '0.85rem', fontWeight: 600, fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>
+                        {cacheInfo?.pingMs !== undefined ? `${cacheInfo.pingMs} ms (Sub-millisecond)` : '< 1 ms'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="settings-row-item">
+                    <div className="settings-row-info">
+                      <span className="settings-row-label">Active Cached Objects</span>
+                      <span className="settings-row-caption">Cached keys for users, config versions, firewall, and ethers.</span>
+                    </div>
+                    <div className="settings-row-control">
+                      <span style={{ fontSize: '0.85rem', fontWeight: 600, fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>
+                        {cacheInfo?.keysCount ?? 0} keys
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               {/* SECTION 4: Appearance & Theme Preferences */}
               <div className="settings-section-card">
                 <div className="settings-section-header">
                   <div className="settings-section-title-wrap">
                     <h2 className="settings-section-title">
                       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <circle cx="12" cy="12" r="5"/>
-                        <line x1="12" y1="1" x2="12" y2="3"/>
-                        <line x1="12" y1="21" x2="12" y2="23"/>
-                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
-                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
-                        <line x1="1" y1="12" x2="3" y2="12"/>
-                        <line x1="21" y1="12" x2="23" y2="12"/>
-                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
-                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+                        <circle cx="12" cy="12" r="5" />
+                        <line x1="12" y1="1" x2="12" y2="3" />
+                        <line x1="12" y1="21" x2="12" y2="23" />
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+                        <line x1="1" y1="12" x2="3" y2="12" />
+                        <line x1="21" y1="12" x2="23" y2="12" />
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
                       </svg>
                       Appearance &amp; Theme
                     </h2>
@@ -2692,9 +2827,9 @@ export default function DashboardPage() {
                   <div className="settings-section-title-wrap">
                     <h2 className="settings-section-title">
                       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                        <polyline points="7 10 12 15 17 10"/>
-                        <line x1="12" y1="15" x2="12" y2="3"/>
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                        <polyline points="7 10 12 15 17 10" />
+                        <line x1="12" y1="15" x2="12" y2="3" />
                       </svg>
                       System Maintenance &amp; Backup
                     </h2>
@@ -2803,7 +2938,7 @@ export default function DashboardPage() {
                 <input
                   type="text"
                   className="form-input-element"
-                  placeholder="e.g. ratul ahmed or TP-Link-Anik"
+                  placeholder="e.g. ratul ahmed or Rezwan-Ahmed"
                   value={formName}
                   onChange={(e) => setFormName(e.target.value)}
                   required
@@ -2859,8 +2994,8 @@ export default function DashboardPage() {
                           isRestrictedForSubadmin
                             ? 'Protected group (Administrator only)'
                             : isProtectedConflict
-                            ? 'Cannot assign to No Internet while assigned to protected group. Remove protected group first.'
-                            : ''
+                              ? 'Cannot assign to No Internet while assigned to protected group. Remove protected group first.'
+                              : ''
                         }
                       >
                         <input
@@ -3108,9 +3243,9 @@ export default function DashboardPage() {
                   max={
                     currentUser?.role === 'subadmin'
                       ? (() => {
-                          const maxDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-                          return new Date(maxDate.getTime() - maxDate.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
-                        })()
+                        const maxDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+                        return new Date(maxDate.getTime() - maxDate.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+                      })()
                       : undefined
                   }
                   style={{ fontSize: '0.84rem' }}
