@@ -14,6 +14,7 @@
   ![Supabase](https://img.shields.io/badge/Supabase-Database-3FCF8E?style=flat-square&logo=supabase)
   ![Redis](https://img.shields.io/badge/Redis-Cache-DC382D?style=flat-square&logo=redis)
   ![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?style=flat-square&logo=docker)
+  ![CI/CD](https://img.shields.io/badge/CI%2FCD-GitHub%20Actions-2088FF?style=flat-square&logo=github-actions)
   ![OpenWrt](https://img.shields.io/badge/OpenWrt-Compatible-00B5E2?style=flat-square&logo=openwrt)
   ![License](https://img.shields.io/badge/License-MIT-yellow?style=flat-square)
 
@@ -34,8 +35,9 @@
   - [2. Configure Environment](#2-configure-environment)
   - [3. Run Locally](#3-run-locally)
 - [Deployment](#deployment)
-  - [Vercel (Cloud / Serverless)](#vercel-cloud--serverless)
+  - [Automated CI/CD Pipeline (GitHub Actions + Self-Hosted Runner)](#automated-cicd-pipeline-github-actions--self-hosted-runner)
   - [Docker (Standalone / Self-Hosted)](#docker-standalone--self-hosted)
+  - [Vercel (Cloud / Serverless)](#vercel-cloud--serverless)
   - [Manual Deployment](#manual-deployment)
 - [OpenWrt Router Setup](#openwrt-router-setup)
   - [Install Sync Script](#install-sync-script)
@@ -212,13 +214,18 @@ access-manager/
 │   │   ├── supabase.ts         # Supabase client factory
 │   │   └── types.ts            # TypeScript type definitions
 │   └── utils/supabase/         # Supabase SSR helpers
+├── .github/
+│   └── workflows/
+│       └── deploy.yml          # GitHub Actions CI/CD pipeline
 ├── scripts/
-│   └── sync-config.sh          # OpenWrt router sync script (ash-compatible)
+│   ├── sync-config.sh          # OpenWrt router sync script (ash-compatible)
+│   └── deploy-prod.sh          # Production deployment & healthcheck script
 ├── supabase/
 │   ├── schema.sql              # Full database schema + seeds
 │   └── migration.sql           # Schema migration
 ├── Dockerfile                  # Multi-stage production build
-├── docker-compose.yml          # App + Redis deployment
+├── docker-compose.yml          # Local app + Redis development compose
+├── docker-compose.prod.yml     # Production compose (pre-built GHCR image)
 ├── .env.example                # Environment variable template
 └── package.json
 ```
@@ -280,9 +287,89 @@ Open [http://localhost:3000](http://localhost:3000) and log in with the default 
 
 ## Deployment
 
-The application is built with **100% dual-compatibility**: you can deploy it as a serverless web app on **Vercel** or self-host it on a Linux server using **Docker**.
+The application supports multiple deployment architectures:
+1. **[Automated CI/CD (GitHub Actions + Home Servers)](#automated-cicd-pipeline-github-actions--self-hosted-runner)**: Cloud build on push, triggered through your home GitHub Actions runner to deploy on your production server.
+2. **[Docker Standalone](#docker-standalone--self-hosted)**: Single-server VPS or local home server using Docker Compose.
+3. **[Vercel Serverless](#vercel-cloud--serverless)**: Cloud-native zero-maintenance deployment.
 
-### Vercel (Cloud / Serverless)
+---
+
+### Automated CI/CD Pipeline (GitHub Actions + Self-Hosted Runner)
+
+For homelab or private on-premise environments with two servers (**Action Runner Server** and **Production Server**):
+
+```mermaid
+flowchart LR
+    A[git push to GitHub] --> B[GitHub Cloud Runner]
+    B -->|Builds Docker image & Pushes| C[(GitHub Container Registry: ghcr.io)]
+    B -->|Triggers deploy job| D[Home Action Server<br/>Self-Hosted Runner]
+    D -->|SSH via Home LAN| E[Production Server]
+    E -->|docker pull| C
+    E -->|docker compose up -d| F[Running Production App]
+```
+
+#### Pipeline Flow
+1. **GitHub Cloud Runner** (`ubuntu-latest`): Inlines public Next.js variables, builds the multi-stage Docker image, and publishes it to GitHub Container Registry (`ghcr.io`).
+2. **GitHub Action Server** (`runs-on: self-hosted`): Runs the GitHub Actions runner daemon inside your LAN. It receives notification outbound from GitHub without needing public IP or open router ports.
+3. **Production Server**: The Action Server SSHes across your local network and runs [`scripts/deploy-prod.sh`](scripts/deploy-prod.sh), pulling the pre-built image from GHCR and gracefully restarting containers.
+
+#### 1. Setup GitHub Actions Runner on the Action Server
+In GitHub: **Settings** > **Actions** > **Runners** > **New self-hosted runner** (Linux). Follow the on-screen steps:
+```bash
+mkdir actions-runner && cd actions-runner
+tar xzf ./actions-runner-linux-x64-*.tar.gz
+./config.sh --url https://github.com/rezwanahmedratul/openwrt-access-manager --token <TOKEN>
+sudo ./svc.sh install
+sudo ./svc.sh start
+```
+
+#### 2. Configure SSH Trust from Action Server to Production Server
+On your **Action Server**, ensure passwordless SSH to the Production Server:
+```bash
+ssh-keygen -t ed25519 -C "action-server-deploy"
+ssh-copy-id <prod-user>@<prod-server-lan-ip>
+ssh <prod-user>@<prod-server-lan-ip> "echo SSH Connected Successfully"
+```
+
+#### 3. Environment Variables: Build-Time vs Runtime
+Next.js inlines `NEXT_PUBLIC_*` variables into the browser bundle at **build time**. Therefore, variables are split between GitHub Secrets and your production server `.env`:
+
+| Variable | Type | Where to Configure | Purpose |
+|---|---|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | Build-time | GitHub Secrets / Variables & Prod `.env` | Supabase endpoint URL for browser client bundle |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Build-time | GitHub Secrets / Variables & Prod `.env` | Supabase anon key for browser client bundle |
+| `SUPABASE_SERVICE_ROLE_KEY` | Runtime (Secret) | Production `.env` only | Database admin bypass for server API routes |
+| `ROUTER_SECRET` | Runtime (Secret) | Production `.env` only | Shared secret for OpenWrt router sync |
+| `REDIS_URL` | Runtime | Production `.env` only | Local/remote Redis connection URL |
+
+#### 4. GitHub Repository Secrets
+Go to **Settings** > **Secrets and variables** > **Actions** and add:
+- `PROD_HOST`: Production server LAN IP (e.g. `192.168.1.50`)
+- `PROD_USER`: Production server SSH username (e.g. `ubuntu` or `root`)
+- `PROD_PORT`: SSH port (optional, defaults to `22`)
+- `PROD_DIR`: Remote directory on production server (default: `/opt/openwrt-access-manager`)
+- `PROD_SSH_KEY`: *(Optional)* SSH private key if not already configured in `~/.ssh` on the runner
+- `NEXT_PUBLIC_SUPABASE_URL`: Your Supabase URL
+- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`: Your Supabase publishable/anon key
+- `GHCR_PULL_TOKEN`: *(Optional if repo is public)* GitHub PAT with `read:packages` to pull private GHCR images
+
+#### 5. Prepare the Production Server
+On the **Production Server**:
+```bash
+sudo mkdir -p /opt/openwrt-access-manager
+sudo chown -R $USER:$USER /opt/openwrt-access-manager
+
+# Create your production runtime .env
+cat << 'EOF' > /opt/openwrt-access-manager/.env
+NEXT_PUBLIC_SUPABASE_URL=https://<your-project-ref>.supabase.co
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
+SUPABASE_SERVICE_ROLE_KEY=sb_secret_...
+ROUTER_SECRET=your-secure-production-secret
+REDIS_URL=redis://127.0.0.1:6379
+EOF
+```
+
+---
 
 Deploying to Vercel provides a globally distributed, zero-maintenance HTTPS endpoint for both your web dashboard and OpenWrt router polling.
 
