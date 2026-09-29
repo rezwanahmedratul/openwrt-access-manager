@@ -1295,9 +1295,9 @@ export default function DashboardPage() {
   if (authChecking) {
     return (
       <div className="auth-page-container" style={{ background: 'var(--bg-app)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', color: 'var(--text-secondary)', fontSize: '0.86rem', fontWeight: 500 }}>
-          <span className="gateway-pill-dot" style={{ animation: 'pulse 1s infinite' }}></span>
-          <span>Connecting to OpenWrt Gateway...</span>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
+          <div className="loading-spinner" style={{ width: '24px', height: '24px' }}></div>
+          <span style={{ color: 'var(--text-secondary)', fontSize: '0.86rem', fontWeight: 500 }}>Connecting to OpenWrt Gateway...</span>
         </div>
       </div>
     );
@@ -1678,11 +1678,25 @@ export default function DashboardPage() {
         <main className="dashboard-container">
           {/* Toast Notification */}
           {notification && (
-            <div className="toast-notice">
-              <span>{notification.message}</span>
+            <div className={`toast-notice ${notification.type === 'error' ? 'toast-error' : 'toast-success'}`}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                {notification.type === 'error' ? (
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ flexShrink: 0, color: '#ef4444' }}>
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="15" y1="9" x2="9" y2="15" />
+                    <line x1="9" y1="9" x2="15" y2="15" />
+                  </svg>
+                ) : (
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ flexShrink: 0, color: '#10b981' }}>
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                    <polyline points="22 4 12 14.01 9 11.01" />
+                  </svg>
+                )}
+                <span>{notification.message}</span>
+              </div>
               <button
                 onClick={() => setNotification(null)}
-                style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '4px', borderRadius: '4px', transition: 'background 0.15s' }}
                 aria-label="Close notification"
               >
                 <IconClose size={12} />
@@ -1694,7 +1708,7 @@ export default function DashboardPage() {
               VIEW 1: DASHBOARD / USERS (MAIN ACCESS MANAGER)
               ============================================================ */}
           {activeTab === 'dashboard' && (
-            <>
+            <div className="page-content-animated" key="dashboard">
               {/* Small Top Pill */}
               <div>
                 <div className="gateway-pill">
@@ -2001,8 +2015,26 @@ export default function DashboardPage() {
                   <tbody>
                     {displayedUsers.length === 0 ? (
                       <tr>
-                        <td colSpan={5} style={{ textAlign: 'center', padding: '3.5rem', color: 'var(--text-secondary)' }}>
-                          {loading ? 'Loading users...' : 'No users found.'}
+                        <td colSpan={5} style={{ textAlign: 'center', padding: '3.5rem' }}>
+                          {loading ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem' }}>
+                              <div className="loading-spinner"></div>
+                              <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Loading users...</span>
+                            </div>
+                          ) : (
+                            <div className="empty-state">
+                              <div className="empty-state-icon">
+                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                                  <circle cx="9" cy="7" r="4" />
+                                  <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                                  <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                                </svg>
+                              </div>
+                              <span className="empty-state-text">No users found</span>
+                              <span className="empty-state-hint">{search ? 'Try a different search query' : 'Register a device using the form above'}</span>
+                            </div>
+                          )}
                         </td>
                       </tr>
                     ) : (
@@ -2096,7 +2128,7 @@ export default function DashboardPage() {
                   </tbody>
                 </table>
               </div>
-            </>
+            </div>
           )}
 
           {/* ============================================================
@@ -2104,7 +2136,7 @@ export default function DashboardPage() {
               Opened by clicking "Groups" in the left sidebar
               ============================================================ */}
           {activeTab === 'groups' && (
-            <div>
+            <div className="page-content-animated" key="groups">
               {/* Small Top Pill */}
               <div>
                 <div className="gateway-pill">
@@ -2293,7 +2325,7 @@ export default function DashboardPage() {
               VIEW 3: ACCOUNT TAB (ADMIN & SUBADMIN MANAGEMENT)
               ============================================================ */}
           {activeTab === 'account' && (
-            <div>
+            <div className="page-content-animated" key="account">
               {/* Small Top Pill */}
               <div>
                 <div className="gateway-pill">
@@ -2496,7 +2528,7 @@ export default function DashboardPage() {
               VIEW 4: DEDICATED REDESIGNED SETTINGS PAGE
               ============================================================ */}
           {activeTab === 'settings' && (
-            <div className="settings-page-wrapper">
+            <div className="settings-page-wrapper page-content-animated" key="settings">
               {/* Small Top Pill */}
               <div>
                 <div className="gateway-pill">
@@ -3332,8 +3364,17 @@ export default function DashboardPage() {
                 <tbody>
                   {historyList.length === 0 ? (
                     <tr>
-                      <td colSpan={4} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>
-                        No published configurations found.
+                      <td colSpan={4} style={{ textAlign: 'center', padding: '2.5rem' }}>
+                        <div className="empty-state">
+                          <div className="empty-state-icon">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                              <circle cx="12" cy="12" r="10" />
+                              <polyline points="12 6 12 12 16 14" />
+                            </svg>
+                          </div>
+                          <span className="empty-state-text">No published configurations found</span>
+                          <span className="empty-state-hint">Apply changes to create your first version</span>
+                        </div>
                       </td>
                     </tr>
                   ) : (
