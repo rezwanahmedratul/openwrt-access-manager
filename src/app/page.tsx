@@ -249,6 +249,7 @@ export default function DashboardPage() {
   const [customMacAuthDate, setCustomMacAuthDate] = useState('');
   const [isUpdatingMacAuth, setIsUpdatingMacAuth] = useState(false);
   const [macAuthModalError, setMacAuthModalError] = useState<string | null>(null);
+  const [isApplying, setIsApplying] = useState(false);
 
   // Feedback Notification
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
@@ -927,10 +928,10 @@ export default function DashboardPage() {
     }
   };
 
-  // Apply Changes
+  // Apply Changes (finalize directly without browser confirm popup)
   const handleApply = async () => {
-    const confirmApply = window.confirm('Publish all draft changes and build new OpenWrt configuration snapshot?');
-    if (!confirmApply) return;
+    if (isApplying) return;
+    setIsApplying(true);
 
     try {
       const res = await fetch('/api/apply', { method: 'POST' });
@@ -943,6 +944,8 @@ export default function DashboardPage() {
       }
     } catch (err) {
       showToast('Network error applying changes', 'error');
+    } finally {
+      setIsApplying(false);
     }
   };
 
@@ -3043,9 +3046,16 @@ export default function DashboardPage() {
                 type="button"
                 className="btn btn-primary pending-btn-apply"
                 onClick={handleApply}
+                disabled={isApplying}
               >
-                <span className="btn-text-desktop">Apply Changes</span>
-                <span className="btn-text-mobile">Apply</span>
+                {isApplying ? (
+                  'Applying...'
+                ) : (
+                  <>
+                    <span className="btn-text-desktop">Apply Changes</span>
+                    <span className="btn-text-mobile">Apply</span>
+                  </>
+                )}
               </button>
             </div>
           </div>
