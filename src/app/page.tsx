@@ -2957,35 +2957,37 @@ export default function DashboardPage() {
           STICKY / FLOATING DRAFT BAR
           ============================================================ */}
       {stats.pending_changes > 0 && (
-        <div className="floating-pending-bar">
-          <div className="pending-left-info">
-            <span className="pending-dot-pulse"></span>
-            <span>
-              {stats.pending_changes} pending {stats.pending_changes === 1 ? 'change' : 'changes'} in draft
-            </span>
-          </div>
-          <div className="pending-btn-actions">
-            <button
-              className="btn btn-secondary"
-              onClick={handleUndo}
-              style={{ padding: '0.45rem 0.95rem', fontSize: '0.8rem' }}
-            >
-              Undo
-            </button>
-            <button
-              className="btn btn-ghost"
-              onClick={handleDiscard}
-              style={{ color: 'inherit', padding: '0.45rem 0.95rem', fontSize: '0.8rem' }}
-            >
-              Discard
-            </button>
-            <button
-              className="btn btn-primary"
-              onClick={handleApply}
-              style={{ padding: '0.45rem 1.1rem', fontSize: '0.8rem' }}
-            >
-              Apply Changes
-            </button>
+        <div className="floating-pending-bar-wrapper">
+          <div className="floating-pending-bar">
+            <div className="pending-left-info">
+              <span className="pending-dot-pulse"></span>
+              <span>
+                {stats.pending_changes} pending {stats.pending_changes === 1 ? 'change' : 'changes'} in draft
+              </span>
+            </div>
+            <div className="pending-btn-actions">
+              <button
+                className="btn btn-secondary"
+                onClick={handleUndo}
+                style={{ padding: '0.45rem 0.95rem', fontSize: '0.8rem' }}
+              >
+                Undo
+              </button>
+              <button
+                className="btn btn-ghost"
+                onClick={handleDiscard}
+                style={{ color: 'inherit', padding: '0.45rem 0.95rem', fontSize: '0.8rem' }}
+              >
+                Discard
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={handleApply}
+                style={{ padding: '0.45rem 1.1rem', fontSize: '0.8rem' }}
+              >
+                Apply Changes
+              </button>
+            </div>
           </div>
         </div>
       )}
