@@ -22,6 +22,12 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Unauthorized: Invalid router credentials' }, { status: 401 });
   }
 
+  // Check MAC auth status and handle auto-expiration first.
+  // If MAC auth was temporarily disabled and has now expired, getMacAuthSettings()
+  // will publish the new configuration (incrementing version and updating hash)
+  // and invalidate the cache before we query the version.
+  const macAuth = await getMacAuthSettings();
+
   // Check cache first for instant sub-millisecond response
   const cached = await cacheGet<{ version: number; hash: string; created_at: string }>(CONFIG_VERSION_CACHE_KEY);
   if (cached) {
@@ -31,6 +37,14 @@ export async function GET(request: Request) {
         'Cache-Control': 'no-cache',
       },
     });
+  }
+
+  // Calculate safe TTL: never cache beyond the expiration of disabled_until
+  let ttl = 60;
+  if (!macAuth.enabled && macAuth.disabled_until) {
+    const msUntilExpiry = new Date(macAuth.disabled_until).getTime() - Date.now();
+    const secUntilExpiry = Math.max(1, Math.floor(msUntilExpiry / 1000));
+    ttl = Math.min(60, secUntilExpiry);
   }
 
   const supabase = getServiceSupabase();
@@ -54,7 +68,7 @@ export async function GET(request: Request) {
           created_at: config.created_at,
         };
 
-        await cacheSet(CONFIG_VERSION_CACHE_KEY, payload, 60);
+        await cacheSet(CONFIG_VERSION_CACHE_KEY, payload, ttl);
 
         return NextResponse.json(payload, {
           headers: {
@@ -69,7 +83,6 @@ export async function GET(request: Request) {
   }
 
   // Fallback to generating directly from active state
-  const macAuth = await getMacAuthSettings();
   const state = getMockState();
   const mapped: UserConfigInput[] = state.mockUsers.map((u) => {
     const uGroups = u.groups.map((ug) => state.mockGroups.find((mg) => mg.id === ug.id) || ug);
@@ -89,7 +102,7 @@ export async function GET(request: Request) {
     created_at: state.mockLastApplied,
   };
 
-  await cacheSet(CONFIG_VERSION_CACHE_KEY, payload, 60);
+  await cacheSet(CONFIG_VERSION_CACHE_KEY, payload, ttl);
 
   return NextResponse.json(payload, {
     headers: {

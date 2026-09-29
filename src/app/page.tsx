@@ -249,6 +249,7 @@ export default function DashboardPage() {
   const [customMacAuthDate, setCustomMacAuthDate] = useState('');
   const [isUpdatingMacAuth, setIsUpdatingMacAuth] = useState(false);
   const [macAuthModalError, setMacAuthModalError] = useState<string | null>(null);
+  const [macAuthCountdown, setMacAuthCountdown] = useState<string>('');
   const [isApplying, setIsApplying] = useState(false);
 
   // Feedback Notification
@@ -623,6 +624,52 @@ export default function DashboardPage() {
       fetchCacheStatus();
     }
   }, [currentUser, activeTab]);
+
+  // Live countdown and auto-refresh when MAC authentication is temporarily paused
+  useEffect(() => {
+    if (!stats.mac_auth || stats.mac_auth.enabled || !stats.mac_auth.disabled_until) {
+      setMacAuthCountdown('');
+      return;
+    }
+
+    const targetTime = new Date(stats.mac_auth.disabled_until).getTime();
+
+    const updateCountdown = () => {
+      const remainingMs = targetTime - Date.now();
+      if (remainingMs <= 0) {
+        setMacAuthCountdown('Expired — re-enabling...');
+        fetchData();
+        return false;
+      }
+
+      const totalSeconds = Math.floor(remainingMs / 1000);
+      const days = Math.floor(totalSeconds / 86400);
+      const hours = Math.floor((totalSeconds % 86400) / 3600);
+      const minutes = Math.floor((totalSeconds % 3600) / 60);
+      const seconds = totalSeconds % 60;
+
+      if (days > 0) {
+        setMacAuthCountdown(`${days}d ${hours}h ${minutes}m`);
+      } else if (hours > 0) {
+        setMacAuthCountdown(`${hours}h ${minutes}m ${seconds}s`);
+      } else if (minutes > 0) {
+        setMacAuthCountdown(`${minutes}m ${seconds}s`);
+      } else {
+        setMacAuthCountdown(`${seconds}s`);
+      }
+      return true;
+    };
+
+    updateCountdown();
+    const interval = setInterval(() => {
+      const active = updateCountdown();
+      if (!active) {
+        clearInterval(interval);
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [stats.mac_auth?.enabled, stats.mac_auth?.disabled_until]);
 
   // Handle Edit User Save (from Edit Modal)
   const handleSaveUser = async (e: React.FormEvent) => {
@@ -1624,7 +1671,7 @@ export default function DashboardPage() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.25)', padding: '0.4rem 0.85rem', borderRadius: 'var(--radius-md)' }}>
                       <span className="status-indicator-dot" style={{ background: '#ef4444' }}></span>
                       <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#ef4444' }}>
-                        MAC Auth: OFF (Open{stats.mac_auth.disabled_until ? ` until ${formatDateTime(stats.mac_auth.disabled_until)}` : ' permanently'})
+                        MAC Auth: OFF (Open{stats.mac_auth.disabled_until ? ` · Re-enables in ${macAuthCountdown || '...'} (${formatDateTime(stats.mac_auth.disabled_until)})` : ' permanently'})
                       </span>
                     </div>
                   ) : (
@@ -2473,7 +2520,7 @@ export default function DashboardPage() {
                       <div className="mac-auth-timer-chip">
                         <IconClock size={13} />
                         <span>
-                          Re-enables automatically on {formatDateTime(stats.mac_auth.disabled_until)}
+                          Re-enables automatically {macAuthCountdown ? `in ${macAuthCountdown} ` : ''}({formatDateTime(stats.mac_auth.disabled_until)})
                         </span>
                       </div>
                     )}

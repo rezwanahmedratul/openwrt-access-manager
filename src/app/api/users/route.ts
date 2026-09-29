@@ -24,6 +24,9 @@ export async function GET(request: Request) {
   const search = searchParams.get('search') || '';
   const groupFilter = searchParams.get('group') || '';
 
+  // Check and sync MAC auth expiration before querying database/cache
+  const macAuth = await getMacAuthSettings();
+
   const mock = getMockState();
   let rawData: RawUsersData | null = null;
   let cacheHit = false;
@@ -229,7 +232,7 @@ export async function GET(request: Request) {
         pending_changes: draftChanges.length,
         current_version: currentVersion,
         last_applied: lastApplied,
-        mac_auth: await getMacAuthSettings(),
+        mac_auth: macAuth,
       },
       draft_changes: draftChanges,
     },

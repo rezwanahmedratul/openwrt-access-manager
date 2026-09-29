@@ -4,7 +4,7 @@ import { getMockState } from '@/lib/mock-store';
 import { getServiceSupabase } from '@/lib/supabase';
 import { generateFirewallConfig, generateEthersConfig, computeConfigHash, UserConfigInput } from '@/lib/config-generator';
 import { MacAuthSettings } from '@/lib/types';
-import { getMacAuthSettings } from '@/lib/mac-auth';
+import { getMacAuthSettings, scheduleServerExpiryTimer } from '@/lib/mac-auth';
 import { cacheDelPrefix } from '@/lib/cache';
 
 export const dynamic = 'force-dynamic';
@@ -83,6 +83,9 @@ export async function POST(request: Request) {
 
     // Always update in-memory mock store
     state.setMockMacAuth(newMacAuth);
+
+    // Schedule proactive server-side timer for automatic re-enable
+    scheduleServerExpiryTimer(newMacAuth.disabled_until);
 
     const isSupabaseConfigured = Boolean(
       process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_URL.startsWith('http')

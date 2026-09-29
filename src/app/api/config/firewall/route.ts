@@ -24,6 +24,9 @@ export async function GET(request: Request) {
     return new Response('Unauthorized: Invalid router credentials', { status: 401 });
   }
 
+  // Ensure expired MAC auth duration is auto re-enabled and published first
+  const macAuth = await getMacAuthSettings();
+
   // Check cache first
   const cachedContent = await cacheGet<string>(FIREWALL_CACHE_KEY);
   if (cachedContent !== null) {
@@ -36,6 +39,14 @@ export async function GET(request: Request) {
         'Cache-Control': 'no-cache, no-store, must-revalidate',
       },
     });
+  }
+
+  // Calculate safe TTL: never cache beyond the expiration of disabled_until
+  let ttl = 60;
+  if (!macAuth.enabled && macAuth.disabled_until) {
+    const msUntilExpiry = new Date(macAuth.disabled_until).getTime() - Date.now();
+    const secUntilExpiry = Math.max(1, Math.floor(msUntilExpiry / 1000));
+    ttl = Math.min(60, secUntilExpiry);
   }
 
   const supabase = getServiceSupabase();
@@ -63,7 +74,6 @@ export async function GET(request: Request) {
   }
 
   if (!content) {
-    const macAuth = await getMacAuthSettings();
     if (isSupabaseConfigured) {
       try {
         const { data: users } = await supabase
@@ -95,8 +105,8 @@ export async function GET(request: Request) {
     }
   }
 
-  // Store in Redis / memory cache (60 seconds)
-  await cacheSet(FIREWALL_CACHE_KEY, content, 60);
+  // Store in Redis / memory cache with safe TTL
+  await cacheSet(FIREWALL_CACHE_KEY, content, ttl);
 
   return new Response(content, {
     status: 200,
