@@ -15,17 +15,17 @@
 
 # ── Configuration ─────────────────────────────────────────────────────────────
 # Base URL of the Access Manager web panel (no trailing slash)
-SERVER_URL="${ACCESS_MANAGER_URL:-http://192.168.1.100:3000}"
+SERVER_URL="${ACCESS_MANAGER_URL:-https://server.example}"
 
 # Bearer token matching ROUTER_SECRET on the server
 AUTH_TOKEN="${ROUTER_SECRET:-openwrt-secret-token-change-in-production}"
 
-# Paths to the live config files on the router
-FIREWALL_FILE="/etc/config/firewall"
-ETHERS_FILE="/etc/ethers"
+# Paths to the live config files on the router (allows override for testing)
+FIREWALL_FILE="${FIREWALL_CONFIG:-/etc/config/firewall}"
+ETHERS_FILE="${ETHERS_CONFIG:-/etc/ethers}"
 
 # Where we store the last-known config hash to detect changes
-STATE_DIR="/tmp/access-manager"
+STATE_DIR="${STATE_DIRECTORY:-/tmp/access-manager}"
 HASH_FILE="$STATE_DIR/last_config_hash"
 
 # Temporary download directory
@@ -38,8 +38,7 @@ LOCK_FILE="$STATE_DIR/sync.lock"
 MAX_RETRIES=3
 RETRY_DELAY=5
 
-# Connection and transfer timeouts (seconds)
-CONNECT_TIMEOUT=10
+# Network timeout (seconds)
 TRANSFER_TIMEOUT=30
 
 # ── Logging ───────────────────────────────────────────────────────────────────
@@ -84,33 +83,39 @@ acquire_lock() {
 http_get() {
     _url="$1"
     _output="$2"
-    _use_auth="$3"
+    _use_auth="${3:-auth}"
     _attempt=1
 
     while [ "$_attempt" -le "$MAX_RETRIES" ]; do
-        if [ "$_use_auth" = "auth" ]; then
-            _http_code=$(wget -q \
-                --header="Authorization: Bearer $AUTH_TOKEN" \
-                --connect-timeout="$CONNECT_TIMEOUT" \
-                --timeout="$TRANSFER_TIMEOUT" \
-                --server-response \
-                -O "$_output" \
-                "$_url" 2>&1 | awk '/HTTP\//{print $2}' | tail -1)
+        rm -f "$_output" 2>/dev/null
+
+        if command -v curl >/dev/null 2>&1; then
+            if [ -n "$AUTH_TOKEN" ] && [ "$_use_auth" = "auth" ]; then
+                curl -s -f -k -m "$TRANSFER_TIMEOUT" \
+                    -H "Authorization: Bearer $AUTH_TOKEN" \
+                    -o "$_output" "$_url" 2>/dev/null
+            else
+                curl -s -f -k -m "$TRANSFER_TIMEOUT" \
+                    -o "$_output" "$_url" 2>/dev/null
+            fi
         else
-            _http_code=$(wget -q \
-                --connect-timeout="$CONNECT_TIMEOUT" \
-                --timeout="$TRANSFER_TIMEOUT" \
-                --server-response \
-                -O "$_output" \
-                "$_url" 2>&1 | awk '/HTTP\//{print $2}' | tail -1)
+            # OpenWrt wget (compatible with BusyBox wget, uclient-fetch, and GNU wget)
+            if [ -n "$AUTH_TOKEN" ] && [ "$_use_auth" = "auth" ]; then
+                wget -q -T "$TRANSFER_TIMEOUT" --no-check-certificate \
+                    --header="Authorization: Bearer $AUTH_TOKEN" \
+                    -O "$_output" "$_url" 2>/dev/null
+            else
+                wget -q -T "$TRANSFER_TIMEOUT" --no-check-certificate \
+                    -O "$_output" "$_url" 2>/dev/null
+            fi
         fi
 
-        # wget returns 0 on success
+        # Verify output file exists and has non-zero size
         if [ -f "$_output" ] && [ -s "$_output" ]; then
             return 0
         fi
 
-        log "  Attempt $_attempt/$MAX_RETRIES failed (HTTP $_http_code) for $_url"
+        log "  Attempt $_attempt/$MAX_RETRIES failed for $_url"
         _attempt=$(( _attempt + 1 ))
         [ "$_attempt" -le "$MAX_RETRIES" ] && sleep "$RETRY_DELAY"
     done
@@ -194,7 +199,7 @@ main() {
 
     # Parse the JSON response (lightweight: use awk/sed since jq may not exist)
     _remote_hash=$(cat "$_version_file" | sed 's/.*"hash"[[:space:]]*:[[:space:]]*"//' | sed 's/".*//')
-    _remote_version=$(cat "$_version_file" | sed 's/.*"version"[[:space:]]*:[[:space:]]*//' | sed 's/[",}.*//' | tr -d ' ')
+    _remote_version=$(cat "$_version_file" | sed 's/.*"version"[[:space:]]*:[[:space:]]*//' | sed 's/[,}].*//' | tr -d ' "')
 
     if [ -z "$_remote_hash" ] || [ "$_remote_hash" = "null" ]; then
         log_error "Server returned no config hash (no published config?). Response:"
