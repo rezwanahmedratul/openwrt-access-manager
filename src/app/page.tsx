@@ -665,21 +665,78 @@ export default function DashboardPage() {
     }
   };
 
-  // Horizontal Bar: Segmented MAC Input Change (2 characters per box, auto-format & auto-advance)
+  // Helper: Distribute full or partial MAC string across the 6 octet boxes
+  const distributeMacString = (startIndex: number, raw: string) => {
+    const hexOnly = raw.replace(/[^0-9A-Fa-f]/g, '').toUpperCase();
+    if (!hexOnly) return;
+
+    const fullString = hexOnly.slice(0, 12);
+    const newOctets = [...macOctets];
+
+    // For full or multi-segment MACs, always populate starting from box 0
+    const start = fullString.length >= 6 ? 0 : startIndex;
+    for (let i = 0; i < 6; i++) {
+      if (i >= start) {
+        const offset = (i - start) * 2;
+        if (offset < fullString.length) {
+          newOctets[i] = fullString.slice(offset, offset + 2);
+        }
+      }
+    }
+
+    setMacOctets(newOctets);
+    setAddError(null);
+
+    // If 12 characters were provided, focus the Name input directly
+    if (fullString.length >= 12) {
+      nameInputRef.current?.focus();
+    } else {
+      const nextEmpty = newOctets.findIndex((oct) => oct.length < 2);
+      if (nextEmpty !== -1) {
+        macInputRefs.current[nextEmpty]?.focus();
+      } else {
+        nameInputRef.current?.focus();
+      }
+    }
+  };
+
+  // Horizontal Bar: Segmented MAC Input Change (2 characters per box, auto-format & mobile paste support)
   const handleMacChange = (index: number, val: string) => {
     const clean = val.replace(/[^0-9A-Fa-f]/g, '').toUpperCase();
+
+    // If multiple octets pasted at once (e.g. mobile keyboard suggestion or long-press paste)
+    if (clean.length > 2) {
+      distributeMacString(index, clean);
+      return;
+    }
+
     const next = [...macOctets];
     next[index] = clean.slice(0, 2);
     setMacOctets(next);
     setAddError(null);
 
-    if (clean.length >= 2) {
+    if (clean.length === 2) {
       if (index < 5) {
         macInputRefs.current[index + 1]?.focus();
         macInputRefs.current[index + 1]?.select();
       } else {
         nameInputRef.current?.focus();
       }
+    }
+  };
+
+  // Direct Clipboard Paste button helper
+  const handlePasteClipboardDirect = async () => {
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard?.readText) {
+        const text = await navigator.clipboard.readText();
+        if (text) {
+          distributeMacString(0, text);
+          showToast('MAC address pasted from clipboard');
+        }
+      }
+    } catch {
+      macInputRefs.current[0]?.focus();
     }
   };
 
@@ -717,42 +774,11 @@ export default function DashboardPage() {
 
   // Horizontal Bar: Segmented MAC Paste Handler (automatically fits any MAC format into the 6 boxes)
   const handleMacPaste = (index: number, e: React.ClipboardEvent<HTMLInputElement>) => {
-    e.preventDefault();
-    const pasted = e.clipboardData.getData('text');
+    const pasted = e.clipboardData?.getData('text');
     if (!pasted) return;
 
-    // Strip delimiters and invalid non-hex chars
-    const hexOnly = pasted.replace(/[^0-9A-Fa-f]/g, '').toUpperCase();
-    if (!hexOnly) return;
-
-    const fullString = hexOnly.slice(0, 12);
-    const newOctets = [...macOctets];
-
-    // For full or multi-segment MACs, automatically populate starting from box 0
-    const start = fullString.length >= 6 ? 0 : index;
-    for (let i = 0; i < 6; i++) {
-      if (i >= start) {
-        const offset = (i - start) * 2;
-        if (offset < fullString.length) {
-          newOctets[i] = fullString.slice(offset, offset + 2);
-        }
-      }
-    }
-
-    setMacOctets(newOctets);
-    setAddError(null);
-
-    // If 12 characters were provided, focus the Name input directly
-    if (fullString.length >= 12) {
-      nameInputRef.current?.focus();
-    } else {
-      const nextEmpty = newOctets.findIndex((oct) => oct.length < 2);
-      if (nextEmpty !== -1) {
-        macInputRefs.current[nextEmpty]?.focus();
-      } else {
-        nameInputRef.current?.focus();
-      }
-    }
+    e.preventDefault();
+    distributeMacString(index, pasted);
   };
 
   // Horizontal Bar: Submit Add User
@@ -1702,14 +1728,30 @@ export default function DashboardPage() {
                 <form className="horizontal-add-form" onSubmit={handleAddUserDirect}>
                   {/* Field 1: MAC Address (6 separate 2-character boxes) */}
                   <div className="add-bar-field field-mac">
-                    <label className="add-bar-label">MAC Address</label>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.3rem' }}>
+                      <label className="add-bar-label" style={{ margin: 0 }}>MAC Address</label>
+                      <button
+                        type="button"
+                        onClick={handlePasteClipboardDirect}
+                        className="btn-text-action"
+                        style={{ fontSize: '0.72rem', color: 'var(--brand-primary, #6366f1)', padding: '0 4px', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
+                        title="Paste MAC from clipboard"
+                      >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                          <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                        </svg>
+                        <span>Paste</span>
+                      </button>
+                    </div>
                     <div className="mac-segmented-box">
                       {macOctets.map((octet, idx) => (
                         <React.Fragment key={idx}>
                           <input
                             ref={(el) => { macInputRefs.current[idx] = el; }}
                             type="text"
-                            maxLength={2}
+                            maxLength={17}
+                            inputMode="text"
                             className="mac-octet-input"
                             placeholder="00"
                             value={octet}
