@@ -23,7 +23,7 @@ let mockUsers: UserWithGroups[] = [
   {
     id: '1',
     name: 'Ratul',
-    mac_address: '64:DD:E9:D3:C6:AB',
+    mac_address: '6C:00:6B:25:5B:B3',
     created_at: new Date(Date.now() - 86400000 * 5).toISOString(),
     updated_at: new Date(Date.now() - 86400000 * 5).toISOString(),
     groups: [
@@ -33,16 +33,16 @@ let mockUsers: UserWithGroups[] = [
   },
   {
     id: '2',
-    name: 'Sabbir',
-    mac_address: '48:2C:A0:9C:D6:87',
+    name: 'Ratul_Laptop',
+    mac_address: 'E4:C7:67:52:6A:7F',
     created_at: new Date(Date.now() - 86400000 * 4).toISOString(),
     updated_at: new Date(Date.now() - 86400000 * 4).toISOString(),
     groups: [{ id: 'g2', name: 'Friends', is_protected: false, created_at: '', updated_at: '' }],
   },
   {
     id: '3',
-    name: 'TP-Link-Anik',
-    mac_address: '3C:84:6A:48:01:DC',
+    name: 'Newt',
+    mac_address: 'BC:24:11:41:F7:42',
     created_at: new Date(Date.now() - 86400000 * 3).toISOString(),
     updated_at: new Date(Date.now() - 86400000 * 3).toISOString(),
     groups: [{ id: 'g5', name: 'Devices', is_protected: true, created_at: '', updated_at: '' }],
