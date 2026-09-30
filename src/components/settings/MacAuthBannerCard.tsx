@@ -50,7 +50,7 @@ export const MacAuthBannerCard: React.FC<MacAuthBannerCardProps> = ({
               </>
             ) : (
               <>
-                Forwarding set to <code>lan ➔ unspecified</code>. Internet is strictly <strong>restricted to authorized MAC addresses</strong>.
+                Forwarding removed. Internet is strictly <strong>restricted to authorized MAC addresses</strong>.
               </>
             )}
           </p>

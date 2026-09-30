@@ -48,7 +48,7 @@ export const MacAuthModal: React.FC<MacAuthModalProps> = ({
         </div>
 
         <div style={{ fontSize: '0.84rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-          Turning off MAC authentication sets firewall forwarding to <code>lan ➔ wan</code>, allowing <strong>everyone on the local network</strong> to access the internet freely without MAC registration.
+          Turning off MAC authentication adds firewall forwarding (<code>lan ➔ wan</code>), allowing <strong>everyone on the local network</strong> to access the internet freely without MAC registration.
         </div>
 
         {macAuthModalError && (

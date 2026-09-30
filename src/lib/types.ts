@@ -102,7 +102,7 @@ export interface ApplyResult {
 }
 
 export interface MacAuthSettings {
-  enabled: boolean; // true = destination 'unspecified' (MAC auth ON), false = destination 'wan' (MAC auth OFF, open to all)
+  enabled: boolean; // true = forwarding removed (MAC auth ON, restricted to registered MACs), false = forwarding lan ➔ wan added (MAC auth OFF, open to all)
   disabled_until: string | null; // ISO string if temporarily disabled, null if permanently
   disabled_by_role?: AccountRole;
 }

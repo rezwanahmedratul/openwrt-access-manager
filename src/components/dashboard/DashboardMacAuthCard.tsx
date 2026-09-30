@@ -59,7 +59,7 @@ export const DashboardMacAuthCard: React.FC<DashboardMacAuthCardProps> = ({
               </>
             ) : (
               <>
-                Firewall forwarding restricted (<code>lan ➔ unspecified</code>). Only registered MAC devices are granted WAN access.
+                Firewall forwarding removed. Only registered MAC devices are granted WAN access.
               </>
             )}
           </p>

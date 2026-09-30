@@ -142,9 +142,8 @@ export interface UserConfigInput {
  * - Allowed users are added to "Allow Internet Access" (target ACCEPT, proto all).
  * - No-Internet tagged users are added to "Block Internet" (target DROP, proto all).
  * - Forwarding section:
- *    - When macAuthEnabled is true (MAC authentication ON): option dest 'unspecified'
- *    - When macAuthEnabled is false (MAC authentication OFF): option dest 'wan'
- * Ensures exactly one single forwarding section exists without duplicate entries.
+ *    - When macAuthEnabled is true (MAC authentication ON): forwarding section is removed completely
+ *    - When macAuthEnabled is false (MAC authentication OFF): config forwarding src 'lan' dest 'wan' is added
  * Users sorted by MAC address for complete reproducibility.
  */
 export function generateFirewallConfig(users: UserConfigInput[], macAuthEnabled: boolean = true): string {
@@ -170,9 +169,14 @@ export function generateFirewallConfig(users: UserConfigInput[], macAuthEnabled:
     config += `\n\tlist src_mac '${user.mac_address}'`;
   }
 
-  // Exactly one forwarding block: 'unspecified' when MAC auth is on, 'wan' when MAC auth is off
-  const destTarget = macAuthEnabled ? 'unspecified' : 'wan';
-  config += `\n\nconfig forwarding\n\toption src 'lan'\n\toption dest '${destTarget}'\n`;
+  // Forwarding section:
+  // Turning on MAC authentication removes 'config forwarding' entirely (nothing is added).
+  // Turning off MAC authentication adds 'config forwarding' with src 'lan' and dest 'wan'.
+  if (!macAuthEnabled) {
+    config += `\n\nconfig forwarding\n\toption src 'lan'\n\toption dest 'wan'`;
+  }
+
+  config += `\n`;
   return config;
 }
 

@@ -675,8 +675,8 @@ Generates a complete `/etc/config/firewall` with:
 - Per-user `Allow Internet Access` rule (by MAC address)
 - Per-user `Block Internet` rule for users in no-internet groups
 - Forwarding section controlled by MAC auth toggle:
-  - **MAC auth ON** → `option dest 'unspecified'` (only listed MACs get internet)
-  - **MAC auth OFF** → `option dest 'wan'` (all devices get internet)
+  - **MAC auth ON** → `config forwarding` omitted/removed (only listed MACs get internet)
+  - **MAC auth OFF** → `config forwarding` with `option src 'lan'` and `option dest 'wan'` added (all devices get internet)
 
 ### Ethers Config
 

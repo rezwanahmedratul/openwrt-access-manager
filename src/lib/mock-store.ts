@@ -64,7 +64,7 @@ let mockVersion = 1;
 let mockLastApplied: string | null = new Date(Date.now() - 86400000).toISOString();
 
 let mockMacAuth: MacAuthSettings = {
-  enabled: true, // true = MAC auth ON (forwarding dest 'unspecified')
+  enabled: true, // true = MAC auth ON (forwarding removed), false = MAC auth OFF (forwarding lan ➔ wan)
   disabled_until: null,
 };
 
