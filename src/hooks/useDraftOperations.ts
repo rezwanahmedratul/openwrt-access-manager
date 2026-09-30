@@ -1,17 +1,19 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { UserViewModel, Group } from '@/lib/types';
 import { normalizeName } from '@/lib/normalize-name';
 import { normalizeMac } from '@/lib/normalize-mac';
 
 interface UseDraftOperationsProps {
+  users?: UserViewModel[];
   groups: Group[];
   onRefresh: () => void;
   onShowToast: (message: string, type?: 'success' | 'error') => void;
 }
 
 export function useDraftOperations({
+  users = [],
   groups,
   onRefresh,
   onShowToast,
@@ -25,6 +27,36 @@ export function useDraftOperations({
   const [formMac, setFormMac] = useState('');
   const [formGroupIds, setFormGroupIds] = useState<string[]>([]);
   const [formError, setFormError] = useState<string | null>(null);
+
+  // Duplicate checks against other existing users
+  const duplicateMacUser = useMemo(() => {
+    if (!formMac.trim() || !editingUserId) return null;
+    const norm = normalizeMac(formMac);
+    if (!norm.valid) return null;
+    return (
+      users.find(
+        (u) =>
+          u.id !== editingUserId &&
+          u.status !== 'deleted' &&
+          u.mac_address.toUpperCase() === norm.normalized.toUpperCase()
+      ) || null
+    );
+  }, [formMac, editingUserId, users]);
+
+  const duplicateNameUser = useMemo(() => {
+    if (!formName.trim() || !editingUserId) return null;
+    const norm = normalizeName(formName);
+    const targetName = (norm.valid ? norm.normalized : formName.trim()).toLowerCase();
+    return (
+      users.find(
+        (u) =>
+          u.id !== editingUserId &&
+          u.status !== 'deleted' &&
+          (u.name.toLowerCase() === targetName ||
+            u.name.toLowerCase().replace(/_/g, ' ') === formName.trim().toLowerCase().replace(/_/g, ' '))
+      ) || null
+    );
+  }, [formName, editingUserId, users]);
 
   // Open Edit Dialog
   const openEditModal = (user: UserViewModel) => {
@@ -50,6 +82,17 @@ export function useDraftOperations({
     const normMac = normalizeMac(formMac);
     if (!normMac.valid) {
       setFormError(normMac.error || 'Invalid MAC');
+      return;
+    }
+
+    // Uniqueness validation
+    if (duplicateMacUser) {
+      setFormError(`MAC address ${normMac.normalized} already exists (registered to "${duplicateMacUser.name}").`);
+      return;
+    }
+
+    if (duplicateNameUser) {
+      setFormError(`User name "${normName.normalized}" already exists (registered to MAC ${duplicateNameUser.mac_address}).`);
       return;
     }
 
@@ -185,6 +228,8 @@ export function useDraftOperations({
     setFormGroupIds,
     formError,
     setFormError,
+    duplicateMacUser,
+    duplicateNameUser,
     openEditModal,
     handleSaveUser,
     handleDeleteUser,

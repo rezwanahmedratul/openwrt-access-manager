@@ -14,6 +14,7 @@ export interface ParsedImportItem {
   isValid: boolean;
   error?: string | null;
   isDuplicate: boolean;
+  duplicateReason?: string | null;
 }
 
 interface ImportModalProps {
@@ -145,7 +146,7 @@ export const ImportModal: React.FC<ImportModalProps> = ({
                     )}
                     {item.isDuplicate && (
                       <span style={{ fontSize: '0.68rem', color: '#f59e0b', fontWeight: 600 }}>
-                        ⚠️ Duplicate
+                        ⚠️ {item.duplicateReason || 'Duplicate'}
                       </span>
                     )}
                   </div>

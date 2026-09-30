@@ -1,5 +1,5 @@
 import React from 'react';
-import { Group, SessionUser } from '@/lib/types';
+import { Group, SessionUser, UserViewModel } from '@/lib/types';
 import { IconClose, IconBan, IconLock } from '../icons';
 
 interface EditUserModalProps {
@@ -16,6 +16,8 @@ interface EditUserModalProps {
   currentUser: SessionUser | null;
   onSaveUser: (e: React.FormEvent) => void;
   onGoToGroups: () => void;
+  duplicateMacUser?: UserViewModel | null;
+  duplicateNameUser?: UserViewModel | null;
 }
 
 export const EditUserModal: React.FC<EditUserModalProps> = ({
@@ -32,6 +34,8 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
   currentUser,
   onSaveUser,
   onGoToGroups,
+  duplicateMacUser,
+  duplicateNameUser,
 }) => {
   if (!isOpen) return null;
 
@@ -58,6 +62,12 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
               onChange={(e) => setFormName(e.target.value)}
               required
             />
+            {duplicateNameUser && (
+              <div className="quick-add-dup-warning" style={{ marginTop: '0.4rem' }}>
+                <span>⚠️</span>
+                <span>Notice: User name &quot;{duplicateNameUser.name}&quot; already exists (assigned to MAC {duplicateNameUser.mac_address})</span>
+              </div>
+            )}
             <div className="form-help-caption">Spaces convert to underscores; hyphens are preserved (e.g. Ratul_Ahmed).</div>
           </div>
 
@@ -71,6 +81,12 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
               onChange={(e) => setFormMac(e.target.value)}
               required
             />
+            {duplicateMacUser && (
+              <div className="quick-add-dup-warning" style={{ marginTop: '0.4rem' }}>
+                <span>⚠️</span>
+                <span>Notice: MAC address already registered to &quot;{duplicateMacUser.name}&quot;</span>
+              </div>
+            )}
             <div className="form-help-caption">Formats any 12-char hex string, colons, or dashes into canonical format.</div>
           </div>
 

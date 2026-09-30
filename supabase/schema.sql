@@ -4,7 +4,7 @@
 -- 1. Users Table
 CREATE TABLE IF NOT EXISTS public.users (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name TEXT NOT NULL,
+    name TEXT NOT NULL UNIQUE,
     mac_address TEXT NOT NULL UNIQUE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS public.users (
 
 -- Index for case-insensitive and prefix lookups
 CREATE INDEX IF NOT EXISTS idx_users_name ON public.users(name);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_name_unique ON public.users(lower(name));
 CREATE INDEX IF NOT EXISTS idx_users_mac ON public.users(mac_address);
 
 -- 2. Groups Table

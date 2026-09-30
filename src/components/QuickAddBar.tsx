@@ -20,6 +20,7 @@ interface QuickAddBarProps {
   onAddUser: (e: React.FormEvent) => void;
   quickAddVendor: string | null;
   quickAddDuplicate: UserViewModel | null;
+  quickAddDuplicateName?: UserViewModel | null;
   macInputRefs: React.MutableRefObject<(HTMLInputElement | null)[]>;
   nameInputRef: React.MutableRefObject<HTMLInputElement | null>;
 }
@@ -42,6 +43,7 @@ export const QuickAddBar: React.FC<QuickAddBarProps> = ({
   onAddUser,
   quickAddVendor,
   quickAddDuplicate,
+  quickAddDuplicateName,
   macInputRefs,
   nameInputRef,
 }) => {
@@ -166,6 +168,12 @@ export const QuickAddBar: React.FC<QuickAddBarProps> = ({
                   }
                 }}
               />
+              {quickAddDuplicateName && (
+                <div className="quick-add-dup-warning">
+                  <span>⚠️</span>
+                  <span>Notice: Name already registered to &quot;{quickAddDuplicateName.name}&quot; ({quickAddDuplicateName.mac_address})</span>
+                </div>
+              )}
             </div>
 
             {/* Field 3: Group */}

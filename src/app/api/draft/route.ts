@@ -11,6 +11,7 @@ import {
   validateGroupCompatibility,
   checkSubadminProtection,
   checkMacConflict,
+  checkNameConflict,
 } from '@/lib/draft-service';
 
 export async function POST(request: Request) {
@@ -82,6 +83,18 @@ export async function POST(request: Request) {
     );
     if (macCheck.conflict) {
       return NextResponse.json({ error: macCheck.error }, { status: 400 });
+    }
+
+    // Check duplicate or conflicting User names
+    const nameCheck = await checkNameConflict(
+      operation,
+      normalizedNameStr,
+      user_id,
+      supabase,
+      isSupabaseConfigured
+    );
+    if (nameCheck.conflict) {
+      return NextResponse.json({ error: nameCheck.error }, { status: 400 });
     }
 
     if (isSupabaseConfigured) {

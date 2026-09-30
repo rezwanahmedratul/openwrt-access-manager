@@ -269,3 +269,125 @@ export async function checkMacConflict(
 
   return { conflict: false };
 }
+
+export async function checkNameConflict(
+  operation: string,
+  normalizedNameStr: string,
+  userId: string | undefined,
+  supabase: any,
+  isSupabaseConfigured: boolean
+): Promise<{ conflict: boolean; error?: string }> {
+  if (operation === 'DELETE') return { conflict: false };
+
+  const targetName = normalizedNameStr.trim().toLowerCase();
+
+  if (isSupabaseConfigured) {
+    if (operation === 'ADD') {
+      const { data: existingUser } = await supabase
+        .from('users')
+        .select('id, name, mac_address')
+        .ilike('name', normalizedNameStr)
+        .maybeSingle();
+
+      if (existingUser) {
+        return {
+          conflict: true,
+          error: `User name "${existingUser.name}" already exists (assigned to MAC ${existingUser.mac_address}).`,
+        };
+      }
+
+      const { data: pendingDrafts } = await supabase
+        .from('draft_changes')
+        .select('id, user_data')
+        .neq('operation', 'DELETE');
+
+      const draftDup = (pendingDrafts || []).find(
+        (d: any) => d.user_data?.name?.toLowerCase() === targetName
+      );
+      if (draftDup) {
+        return {
+          conflict: true,
+          error: `User name "${normalizedNameStr}" is already queued in pending draft changes for MAC ${draftDup.user_data?.mac_address}.`,
+        };
+      }
+    } else if (operation === 'MODIFY') {
+      const { data: existingUsers } = await supabase
+        .from('users')
+        .select('id, name, mac_address')
+        .ilike('name', normalizedNameStr);
+
+      const conflictUser = (existingUsers || []).find((u: any) => u.id !== userId);
+      if (conflictUser) {
+        return {
+          conflict: true,
+          error: `User name "${conflictUser.name}" already exists (assigned to MAC ${conflictUser.mac_address}).`,
+        };
+      }
+
+      const { data: pendingDrafts } = await supabase
+        .from('draft_changes')
+        .select('id, user_id, user_data')
+        .neq('operation', 'DELETE');
+
+      const draftDup = (pendingDrafts || []).find(
+        (d: any) => d.user_id !== userId && d.user_data?.name?.toLowerCase() === targetName
+      );
+      if (draftDup) {
+        return {
+          conflict: true,
+          error: `User name "${normalizedNameStr}" is already queued in pending draft changes for MAC ${draftDup.user_data?.mac_address}.`,
+        };
+      }
+    }
+  } else {
+    const state = getMockState();
+
+    if (operation === 'ADD') {
+      const existingUser = state.mockUsers.find(
+        (u) => u.name.toLowerCase() === targetName
+      );
+      if (existingUser) {
+        return {
+          conflict: true,
+          error: `User name "${existingUser.name}" already exists (assigned to MAC ${existingUser.mac_address}).`,
+        };
+      }
+
+      const pendingDup = state.mockDraftChanges.find(
+        (d) => d.operation !== 'DELETE' && d.user_data?.name?.toLowerCase() === targetName
+      );
+      if (pendingDup) {
+        return {
+          conflict: true,
+          error: `User name "${normalizedNameStr}" is already queued in pending draft changes for MAC ${pendingDup.user_data?.mac_address}.`,
+        };
+      }
+    } else if (operation === 'MODIFY') {
+      const conflictUser = state.mockUsers.find(
+        (u) => u.id !== userId && u.name.toLowerCase() === targetName
+      );
+      if (conflictUser) {
+        return {
+          conflict: true,
+          error: `User name "${conflictUser.name}" already exists (assigned to MAC ${conflictUser.mac_address}).`,
+        };
+      }
+
+      const pendingDup = state.mockDraftChanges.find(
+        (d) =>
+          d.user_id !== userId &&
+          d.operation !== 'DELETE' &&
+          d.user_data?.name?.toLowerCase() === targetName
+      );
+      if (pendingDup) {
+        return {
+          conflict: true,
+          error: `User name "${normalizedNameStr}" is already queued in pending draft changes for MAC ${pendingDup.user_data?.mac_address}.`,
+        };
+      }
+    }
+  }
+
+  return { conflict: false };
+}
+

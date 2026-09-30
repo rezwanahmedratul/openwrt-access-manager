@@ -99,6 +99,7 @@ export default function DashboardPage() {
 
   // Draft Operations & User Editing
   const draft = useDraftOperations({
+    users,
     groups,
     onRefresh: fetchData,
     onShowToast: showToast,
@@ -236,6 +237,7 @@ export default function DashboardPage() {
               onAddUser={quickAdd.handleAddUserDirect}
               quickAddVendor={quickAdd.quickAddVendor}
               quickAddDuplicate={quickAdd.quickAddDuplicate}
+              quickAddDuplicateName={quickAdd.quickAddDuplicateName}
               macInputRefs={quickAdd.macInputRefs}
               nameInputRef={quickAdd.nameInputRef}
               users={users}
@@ -418,6 +420,8 @@ export default function DashboardPage() {
         groups={groups}
         currentUser={currentUser}
         onSaveUser={draft.handleSaveUser}
+        duplicateMacUser={draft.duplicateMacUser}
+        duplicateNameUser={draft.duplicateNameUser}
         onGoToGroups={() => {
           draft.setModalMode(null);
           handleTabChange('groups');

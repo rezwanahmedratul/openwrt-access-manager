@@ -32,6 +32,7 @@ interface DashboardViewProps {
   onAddUser: (e: React.FormEvent) => void;
   quickAddVendor: string | null;
   quickAddDuplicate: UserViewModel | null;
+  quickAddDuplicateName?: UserViewModel | null;
   macInputRefs: React.MutableRefObject<(HTMLInputElement | null)[]>;
   nameInputRef: React.MutableRefObject<HTMLInputElement | null>;
   // User Table & Pagination Props
@@ -92,6 +93,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onAddUser,
   quickAddVendor,
   quickAddDuplicate,
+  quickAddDuplicateName,
   macInputRefs,
   nameInputRef,
   users,
@@ -182,6 +184,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         onAddUser={onAddUser}
         quickAddVendor={quickAddVendor}
         quickAddDuplicate={quickAddDuplicate}
+        quickAddDuplicateName={quickAddDuplicateName}
         macInputRefs={macInputRefs}
         nameInputRef={nameInputRef}
       />

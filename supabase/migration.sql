@@ -83,3 +83,7 @@ CREATE POLICY "Allow all draft_changes" ON public.draft_changes FOR ALL TO publi
 CREATE POLICY "Allow all configurations" ON public.configurations FOR ALL TO public USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all accounts" ON public.accounts FOR ALL TO public USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all app_settings" ON public.app_settings FOR ALL TO public USING (true) WITH CHECK (true);
+
+-- 7. Ensure unique user names (case-insensitive)
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_name_unique ON public.users(lower(name));
+

@@ -29,6 +29,9 @@ export function useBatchImport({
   const parsedImportItems = useMemo(() => {
     if (!importText.trim()) return [];
     const lines = importText.split('\n');
+    const seenMacsInBatch = new Set<string>();
+    const seenNamesInBatch = new Set<string>();
+
     return lines
       .map((line, idx) => {
         const trimmed = line.trim();
@@ -47,11 +50,42 @@ export function useBatchImport({
         const macRes = normalizeMac(rawMac);
         const nameRes = normalizeName(rawName);
 
-        const isDuplicateExisting =
+        const normalizedMacUpper = macRes.valid ? macRes.normalized.toUpperCase() : '';
+        const normalizedNameLower = nameRes.valid ? nameRes.normalized.toLowerCase() : '';
+
+        // Check duplicate MAC against existing active users or earlier items in batch
+        const isDuplicateMacExisting =
           macRes.valid &&
           users.some(
-            (u) => u.status !== 'deleted' && u.mac_address.toUpperCase() === macRes.normalized.toUpperCase()
+            (u) => u.status !== 'deleted' && u.mac_address.toUpperCase() === normalizedMacUpper
           );
+        const isDuplicateMacBatch = macRes.valid && seenMacsInBatch.has(normalizedMacUpper);
+        const isDuplicateMac = isDuplicateMacExisting || isDuplicateMacBatch;
+
+        // Check duplicate Name against existing active users or earlier items in batch
+        const isDuplicateNameExisting =
+          nameRes.valid &&
+          users.some(
+            (u) =>
+              u.status !== 'deleted' &&
+              (u.name.toLowerCase() === normalizedNameLower ||
+                u.name.toLowerCase().replace(/_/g, ' ') === normalizedNameLower.replace(/_/g, ' '))
+          );
+        const isDuplicateNameBatch = nameRes.valid && seenNamesInBatch.has(normalizedNameLower);
+        const isDuplicateName = isDuplicateNameExisting || isDuplicateNameBatch;
+
+        if (macRes.valid) seenMacsInBatch.add(normalizedMacUpper);
+        if (nameRes.valid) seenNamesInBatch.add(normalizedNameLower);
+
+        const isDuplicate = isDuplicateMac || isDuplicateName;
+        const duplicateReason =
+          isDuplicateMac && isDuplicateName
+            ? 'Duplicate MAC & Name'
+            : isDuplicateMac
+            ? 'Duplicate MAC'
+            : isDuplicateName
+            ? 'Duplicate Name'
+            : null;
 
         let matchedGroup = groups.find((g) => g.name.toLowerCase() === rawGroupName.toLowerCase());
         if (!matchedGroup && importTargetGroup) {
@@ -74,7 +108,8 @@ export function useBatchImport({
           group: matchedGroup,
           isValid: macRes.valid && nameRes.valid,
           error: !macRes.valid ? macRes.error : !nameRes.valid ? nameRes.error : null,
-          isDuplicate: isDuplicateExisting,
+          isDuplicate,
+          duplicateReason,
         };
       })
       .filter(Boolean) as {
@@ -89,6 +124,7 @@ export function useBatchImport({
         isValid: boolean;
         error?: string | null;
         isDuplicate: boolean;
+        duplicateReason?: string | null;
       }[];
   }, [importText, users, groups, importTargetGroup]);
 

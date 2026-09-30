@@ -41,6 +41,21 @@ export function useQuickAdd({ users, groups, onSuccess, onShowToast }: UseQuickA
     return null;
   }, [macOctets, users, quickAddMacString]);
 
+  const quickAddDuplicateName = useMemo(() => {
+    const trimmed = addName.trim();
+    if (!trimmed) return null;
+    const norm = normalizeName(trimmed);
+    const targetName = norm.valid ? norm.normalized.toLowerCase() : trimmed.toLowerCase();
+    return (
+      users.find(
+        (u) =>
+          u.status !== 'deleted' &&
+          (u.name.toLowerCase() === targetName ||
+            u.name.toLowerCase().replace(/_/g, ' ') === trimmed.toLowerCase().replace(/_/g, ' '))
+      ) || null
+    );
+  }, [addName, users]);
+
   // Helper: Distribute full or partial MAC string across the 6 octet boxes
   const distributeMacString = (startIndex: number, raw: string) => {
     const hexOnly = raw.replace(/[^0-9A-Fa-f]/g, '').toUpperCase();
@@ -184,6 +199,29 @@ export function useQuickAdd({ users, groups, onSuccess, onShowToast }: UseQuickA
       return;
     }
 
+    // Uniqueness validation: MAC Address
+    const existingByMac = users.find(
+      (u) => u.status !== 'deleted' && u.mac_address.toUpperCase() === normMac.normalized.toUpperCase()
+    );
+    if (existingByMac) {
+      setAddError(`MAC address ${normMac.normalized} already exists (registered to "${existingByMac.name}").`);
+      return;
+    }
+
+    // Uniqueness validation: User Name
+    const targetName = normName.normalized.toLowerCase();
+    const existingByName = users.find(
+      (u) =>
+        u.status !== 'deleted' &&
+        (u.name.toLowerCase() === targetName ||
+          u.name.toLowerCase().replace(/_/g, ' ') === normName.normalized.toLowerCase().replace(/_/g, ' '))
+    );
+    if (existingByName) {
+      setAddError(`User name "${normName.normalized}" already exists (registered to MAC ${existingByName.mac_address}).`);
+      nameInputRef.current?.focus();
+      return;
+    }
+
     try {
       setIsAdding(true);
       const defaultGroup = groups.find((g) => g.name.toLowerCase() === 'default');
@@ -244,6 +282,7 @@ export function useQuickAdd({ users, groups, onSuccess, onShowToast }: UseQuickA
     quickAddMacString,
     quickAddVendor,
     quickAddDuplicate,
+    quickAddDuplicateName,
     distributeMacString,
     handleMacChange,
     handleMacKeyDown,
