@@ -542,8 +542,9 @@
 
 .history-search-input-wrap {
   position: relative;
-  flex: 1 1 280px;
-  min-width: 220px;
+  flex: 1 1 auto;
+  max-width: 380px;
+  min-width: 200px;
   display: flex;
   align-items: center;
 }
@@ -927,27 +928,41 @@
   .history-filter-card {
     flex-direction: column !important;
     align-items: stretch !important;
-    gap: 0.45rem !important;
-    padding: 0.55rem 0.75rem !important;
+    gap: 0.4rem !important;
+    padding: 0.5rem 0.75rem !important;
     border-radius: var(--radius-sm) !important;
+    height: auto !important;
+    min-height: 0 !important;
+    flex: none !important;
   }
 
   .history-filter-controls {
     flex-direction: column !important;
     align-items: stretch !important;
     gap: 0.4rem !important;
+    height: auto !important;
+    min-height: 0 !important;
+    flex: none !important;
+    width: 100% !important;
   }
 
   .history-search-input-wrap {
+    flex: none !important;
     max-width: 100% !important;
     width: 100% !important;
+    min-width: 0 !important;
+    height: 35px !important;
+    min-height: 0 !important;
+    margin: 0 !important;
   }
 
   .history-search-input {
     height: 35px !important;
+    width: 100% !important;
     font-size: 0.82rem !important;
     padding: 0 1.8rem 0 2rem !important;
     border-radius: var(--radius-xs) !important;
+    box-sizing: border-box !important;
   }
 
   .history-search-icon {
@@ -957,8 +972,17 @@
   }
 
   .history-chip-group {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
     gap: 0.35rem !important;
-    padding: 0.05rem 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    height: auto !important;
+    min-height: 0 !important;
+    flex: none !important;
+    overflow-x: auto !important;
+    width: 100% !important;
   }
 
   .history-filter-chip {
@@ -967,6 +991,8 @@
     height: 26px !important;
     display: inline-flex !important;
     align-items: center !important;
+    white-space: nowrap !important;
+    flex-shrink: 0 !important;
   }
 
   .history-results-count {
