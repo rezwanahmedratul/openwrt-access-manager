@@ -432,7 +432,8 @@
     box-sizing: border-box !important;
   }
 
-  .stat-card-box:hover {
+  .stat-card-box:hover,
+  .history-telemetry-card:hover {
     transform: none !important;
   }
 

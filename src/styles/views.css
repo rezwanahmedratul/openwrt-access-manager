@@ -461,13 +461,19 @@
   justify-content: space-between;
   gap: 0.65rem;
   box-shadow: var(--shadow-subtle);
-  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+  position: relative;
+  transition: all var(--transition-smooth);
   min-width: 0;
 }
 
 .history-telemetry-card:hover {
   border-color: var(--border-strong);
   box-shadow: var(--shadow-card-hover);
+  transform: translateY(-2px);
+}
+
+.history-telemetry-card:hover .history-telemetry-value {
+  transform: scale(1.02);
 }
 
 .history-telemetry-header {
@@ -498,6 +504,7 @@
   align-items: baseline;
   gap: 0.5rem;
   min-width: 0;
+  transition: transform var(--transition-spring);
 }
 
 .history-telemetry-unit {
