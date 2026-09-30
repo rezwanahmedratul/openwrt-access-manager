@@ -1,0 +1,228 @@
+/* ============================================================
+   DESIGN SYSTEM TOKENS - LIGHT & DARK MODE
+   Inspired by Linear, Vercel & Raycast
+   ============================================================ */
+
+:root {
+  /* LIGHT MODE (Default) */
+  --bg-app: #fafafa;
+  --bg-sidebar: #ffffff;
+  --bg-card: #ffffff;
+  --bg-card-subtle: #f4f4f5;
+  --bg-input: #ffffff;
+  --bg-pill: #f4f4f5;
+  --bg-tag: #f4f4f5;
+  --bg-hover: #f4f4f5;
+  --bg-active-nav: #f4f4f5;
+
+  --border-subtle: #e5e7eb;
+  --border-card: #e5e7eb;
+  --border-strong: #d1d5db;
+  --border-focus: #111111;
+
+  --text-primary: #111111;
+  --text-secondary: #6b7280;
+  --text-muted: #9ca3af;
+  --text-inverse: #ffffff;
+
+  --btn-primary-bg: #111111;
+  --btn-primary-text: #ffffff;
+  --btn-primary-hover: #262626;
+
+  --btn-secondary-bg: #ffffff;
+  --btn-secondary-text: #111111;
+  --btn-secondary-border: #e5e7eb;
+  --btn-secondary-hover: #f9fafb;
+
+  --status-applied-bg: #ecfdf5;
+  --status-applied-text: #059669;
+  --status-applied-dot: #10b981;
+
+  --status-added-bg: #111111;
+  --status-added-text: #ffffff;
+  --status-added-dot: #ffffff;
+
+  --status-modified-bg: #fef3c7;
+  --status-modified-text: #d97706;
+  --status-modified-dot: #f59e0b;
+
+  --status-deleted-bg: #f4f4f5;
+  --status-deleted-text: #9ca3af;
+  --status-deleted-dot: #9ca3af;
+
+  --shadow-subtle: 0 1px 3px rgba(0, 0, 0, 0.03), 0 1px 2px rgba(0, 0, 0, 0.02);
+  --shadow-card-hover: 0 4px 12px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.04);
+  --shadow-float: 0 20px 40px -15px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(0, 0, 0, 0.05);
+  --shadow-toast: 0 8px 30px rgba(0, 0, 0, 0.08), 0 2px 8px rgba(0, 0, 0, 0.04);
+
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  --radius-xs: 6px;
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 16px;
+  --radius-pill: 9999px;
+
+  --transition-fast: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-smooth: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-spring: 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+[data-theme="dark"] {
+  /* DARK MODE */
+  --bg-app: #050505;
+  --bg-sidebar: #09090b;
+  --bg-card: #101010;
+  --bg-card-subtle: #17171a;
+  --bg-input: #111111;
+  --bg-pill: #1a1a1e;
+  --bg-tag: #1c1c20;
+  --bg-hover: #18181b;
+  --bg-active-nav: #1c1c20;
+
+  --border-subtle: #242424;
+  --border-card: #242424;
+  --border-strong: #333333;
+  --border-focus: #ffffff;
+
+  --text-primary: #f5f5f5;
+  --text-secondary: #8a8a8a;
+  --text-muted: #52525b;
+  --text-inverse: #000000;
+
+  --btn-primary-bg: #ffffff;
+  --btn-primary-text: #000000;
+  --btn-primary-hover: #e5e5e5;
+
+  --btn-secondary-bg: #101010;
+  --btn-secondary-text: #f5f5f5;
+  --btn-secondary-border: #242424;
+  --btn-secondary-hover: #1a1a1a;
+
+  --status-applied-bg: rgba(16, 185, 129, 0.12);
+  --status-applied-text: #34d399;
+  --status-applied-dot: #10b981;
+
+  --status-added-bg: #ffffff;
+  --status-added-text: #000000;
+  --status-added-dot: #000000;
+
+  --status-modified-bg: rgba(245, 158, 11, 0.15);
+  --status-modified-text: #fbbf24;
+  --status-modified-dot: #f59e0b;
+
+  --status-deleted-bg: #18181b;
+  --status-deleted-text: #52525b;
+  --status-deleted-dot: #52525b;
+
+  --shadow-subtle: 0 1px 3px rgba(0, 0, 0, 0.4);
+  --shadow-card-hover: 0 6px 20px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.3);
+  --shadow-float: 0 20px 48px -15px rgba(0, 0, 0, 0.8), 0 0 0 1px #242424;
+  --shadow-toast: 0 8px 30px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  background-color: var(--bg-app);
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: var(--bg-app);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  min-height: 100vh;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+/* Focus ring utility */
+:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+}
+
+/* ============================================================
+   GLOBAL ANIMATIONS
+   ============================================================ */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeInDown {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(24px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes slideInUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes pulseRing {
+  0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
+  70% { box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
+
+/* Page content animation */
+.page-content-animated {
+  animation: fadeInUp 0.3s var(--transition-smooth) both;
+}
+
+/* App Shell with Left Sidebar */
+.app-shell {
+  display: flex;
+  min-height: 100vh;
+  width: 100%;
+}
+

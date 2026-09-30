@@ -4,6 +4,12 @@ import { getMockState } from '@/lib/mock-store';
 import { Group } from '@/lib/types';
 import { getSessionFromRequest } from '@/lib/auth';
 import { cacheGet, cacheSet, cacheDelPrefix } from '@/lib/cache';
+import {
+  reassignGroupOnDeleteSupabase,
+  reassignGroupOnDeleteMock,
+  checkAndResolveNoInternetSupabase,
+  checkAndResolveNoInternetMock,
+} from '@/lib/group-service';
 
 const GROUPS_CACHE_KEY = 'cache:groups:list';
 
@@ -83,7 +89,6 @@ export async function POST(request: Request) {
     );
 
     if (isSupabaseConfigured) {
-      // Check duplicate
       const { data: existing } = await supabase
         .from('groups')
         .select('id')
@@ -143,147 +148,43 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: 'Group ID is required' }, { status: 400 });
     }
 
+    const session = getSessionFromRequest(request);
     const supabase = getServiceSupabase();
     const isSupabaseConfigured = Boolean(
       process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_URL.startsWith('http')
     );
 
+    // Verify protection status
     if (isSupabaseConfigured) {
-      // Find or create 'Default' group
-      let { data: defaultGroup } = await supabase
-        .from('groups')
-        .select('id, name')
-        .ilike('name', 'Default')
-        .maybeSingle();
-
-      if (!defaultGroup) {
-        const { data: newDef, error: createDefErr } = await supabase
-          .from('groups')
-          .insert({ name: 'Default' })
-          .select('id, name')
-          .single();
-        if (createDefErr) throw createDefErr;
-        defaultGroup = newDef;
+      const { data: targetGroup } = await supabase.from('groups').select('*').eq('id', groupId).maybeSingle();
+      if (targetGroup?.is_protected && session?.role !== 'admin') {
+        return NextResponse.json({ error: 'Only administrators can delete protected groups.' }, { status: 403 });
       }
 
-      if (groupId === defaultGroup.id) {
-        return NextResponse.json({ error: 'Cannot delete the "Default" fallback group.' }, { status: 400 });
+      const result = await reassignGroupOnDeleteSupabase(supabase, groupId);
+      if (result.error) {
+        return NextResponse.json({ error: result.error }, { status: result.status });
       }
-
-      // Find all user_ids belonging to the group being deleted
-      const { data: userLinks } = await supabase
-        .from('user_groups')
-        .select('user_id')
-        .eq('group_id', groupId);
-
-      const affectedUserIds = (userLinks || []).map((ul: any) => ul.user_id);
-
-      // Reassign users to 'Default' group if they are not already in it
-      for (const uid of affectedUserIds) {
-        await supabase
-          .from('user_groups')
-          .insert({ user_id: uid, group_id: defaultGroup.id })
-          .select()
-          .maybeSingle(); // ON CONFLICT DO NOTHING handled by primary key (user_id, group_id)
-      }
-
-      // Delete group (cascade deletes user_groups for this group)
-      const { error: delError } = await supabase.from('groups').delete().eq('id', groupId);
-      if (delError) {
-        return NextResponse.json({ error: delError.message }, { status: 500 });
-      }
-
-      // Also update pending draft changes that referenced this group
-      const { data: changes } = await supabase.from('draft_changes').select('*');
-      if (changes) {
-        for (const ch of changes) {
-          if (ch.user_data && Array.isArray(ch.user_data.group_ids) && ch.user_data.group_ids.includes(groupId)) {
-            const updatedIds = ch.user_data.group_ids.filter((gid: string) => gid !== groupId);
-            if (!updatedIds.includes(defaultGroup.id)) {
-              updatedIds.push(defaultGroup.id);
-            }
-            await supabase
-              .from('draft_changes')
-              .update({
-                user_data: {
-                  ...ch.user_data,
-                  group_ids: updatedIds,
-                },
-              })
-              .eq('id', ch.id);
-          }
-        }
-      }
-
       await invalidateGroupsAndUsersCache();
       return NextResponse.json({
         success: true,
-        message: `Group deleted. Users successfully reassigned to "${defaultGroup.name}".`,
+        message: `Group deleted. Users successfully reassigned to "${result.defaultGroupName}".`,
       });
     } else {
-      // Mock mode
       const state = getMockState();
-
-      let defaultGroup = state.mockGroups.find((g) => g.name.toLowerCase() === 'default');
-      if (!defaultGroup) {
-        defaultGroup = {
-          id: 'g-default',
-          name: 'Default',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        };
-        state.setMockGroups([...state.mockGroups, defaultGroup]);
+      const targetGroup = state.mockGroups.find((g) => g.id === groupId);
+      if (targetGroup?.is_protected && session?.role !== 'admin') {
+        return NextResponse.json({ error: 'Only administrators can delete protected groups.' }, { status: 403 });
       }
 
-      if (groupId === defaultGroup.id) {
-        return NextResponse.json({ error: 'Cannot delete the "Default" fallback group.' }, { status: 400 });
+      const result = reassignGroupOnDeleteMock(state, groupId);
+      if (result.error) {
+        return NextResponse.json({ error: result.error }, { status: result.status });
       }
-
-      // Reassign users in mock state
-      const updatedUsers = state.mockUsers.map((u) => {
-        const hasDeletedGroup = u.groups.some((g) => g.id === groupId);
-        if (!hasDeletedGroup) return u;
-
-        // Filter out deleted group
-        let newGroups = u.groups.filter((g) => g.id !== groupId);
-        // Add default group if not already present
-        if (!newGroups.some((g) => g.id === defaultGroup!.id)) {
-          newGroups.push(defaultGroup!);
-        }
-        return {
-          ...u,
-          groups: newGroups,
-        };
-      });
-
-      state.setMockUsers(updatedUsers);
-
-      // Reassign any pending draft changes
-      const updatedDrafts = state.mockDraftChanges.map((ch) => {
-        if (ch.user_data && Array.isArray(ch.user_data.group_ids) && ch.user_data.group_ids.includes(groupId)) {
-          let updatedIds = ch.user_data.group_ids.filter((id) => id !== groupId);
-          if (!updatedIds.includes(defaultGroup!.id)) {
-            updatedIds.push(defaultGroup!.id);
-          }
-          return {
-            ...ch,
-            user_data: {
-              ...ch.user_data,
-              group_ids: updatedIds,
-            },
-          };
-        }
-        return ch;
-      });
-      state.setMockDraftChanges(updatedDrafts);
-
-      // Remove group from groups list
-      state.setMockGroups(state.mockGroups.filter((g) => g.id !== groupId));
-
       await invalidateGroupsAndUsersCache();
       return NextResponse.json({
         success: true,
-        message: `Group deleted. Users successfully reassigned to "${defaultGroup.name}".`,
+        message: `Group deleted. Users successfully reassigned to "${result.defaultGroupName}".`,
       });
     }
   } catch (err: any) {
@@ -291,7 +192,7 @@ export async function DELETE(request: Request) {
   }
 }
 
-// PATCH toggle group protection, no-internet, or rename
+// PATCH toggle group protection, no internet status, or rename
 export async function PATCH(request: Request) {
   try {
     const session = getSessionFromRequest(request);
@@ -320,7 +221,6 @@ export async function PATCH(request: Request) {
     );
 
     if (isSupabaseConfigured) {
-      // 1. Fetch current group
       const { data: currentGroup, error: fetchErr } = await supabase
         .from('groups')
         .select('*')
@@ -330,7 +230,7 @@ export async function PATCH(request: Request) {
       if (fetchErr) return NextResponse.json({ error: fetchErr.message }, { status: 500 });
       if (!currentGroup) return NextResponse.json({ error: 'Group not found' }, { status: 404 });
 
-      // Default group cannot be renamed, protected, or tagged as No Internet
+      // Default group validation
       if (currentGroup.name.toLowerCase() === 'default') {
         if (is_protected === true || is_no_internet === true || (name && name.trim().toLowerCase() !== 'default')) {
           return NextResponse.json(
@@ -340,96 +240,26 @@ export async function PATCH(request: Request) {
         }
       }
 
-      // Incompatibility: cannot be both Protected and No Internet
+      // Incompatibility check
       if (is_protected === true && (currentGroup.is_no_internet || is_no_internet === true)) {
-        return NextResponse.json(
-          { error: 'A group cannot be both Protected and No Internet.' },
-          { status: 400 }
-        );
+        return NextResponse.json({ error: 'A group cannot be both Protected and No Internet.' }, { status: 400 });
       }
       if (is_no_internet === true && (currentGroup.is_protected || is_protected === true)) {
-        return NextResponse.json(
-          { error: 'A group cannot be both Protected and No Internet.' },
-          { status: 400 }
-        );
+        return NextResponse.json({ error: 'A group cannot be both Protected and No Internet.' }, { status: 400 });
       }
 
       // If enabling No Internet, check member conflicts
       if (is_no_internet === true) {
-        const { data: memberLinks } = await supabase
-          .from('user_groups')
-          .select('user_id')
-          .eq('group_id', id);
-
-        const userIds = (memberLinks || []).map((ul: any) => ul.user_id);
-
-        if (userIds.length > 0) {
-          const { data: members } = await supabase
-            .from('users')
-            .select(`
-              id, name, mac_address,
-              user_groups (
-                groups ( id, name, is_protected, is_no_internet )
-              )
-            `)
-            .in('id', userIds);
-
-          // Check if any member is in a protected group
-          for (const m of members || []) {
-            const allGroups = (m.user_groups || []).map((ug: any) => ug.groups).filter(Boolean);
-            const protG = allGroups.find((g: any) => g.is_protected);
-            if (protG) {
-              return NextResponse.json(
-                {
-                  error: `Cannot tag group as No Internet: Member "${m.name}" is currently in protected group "${protG.name}". Administrator must remove the user from the protected group first.`,
-                  protected_conflict: true,
-                },
-                { status: 400 }
-              );
-            }
-          }
-
-          // Check multi-group conflicts (member also belongs to other internet-enabled groups)
-          const conflicts: { userId: string; userName: string; mac: string; otherGroups: string[] }[] = [];
-          for (const m of members || []) {
-            const allGroups = (m.user_groups || []).map((ug: any) => ug.groups).filter(Boolean);
-            const otherGs = allGroups.filter((g: any) => g.id !== id && !g.is_no_internet);
-            if (otherGs.length > 0) {
-              conflicts.push({
-                userId: m.id,
-                userName: m.name,
-                mac: m.mac_address,
-                otherGroups: otherGs.map((g: any) => g.name),
-              });
-            }
-          }
-
-          if (conflicts.length > 0) {
-            const conflictUserIds = conflicts.map((c) => c.userId);
-
-            if (conflict_action === 'force_add') {
-              // Remove conflicting users from all other groups
-              await supabase
-                .from('user_groups')
-                .delete()
-                .in('user_id', conflictUserIds)
-                .neq('group_id', id);
-            } else if (conflict_action === 'remove_from_group') {
-              // Remove conflicting users from this group
-              await supabase
-                .from('user_groups')
-                .delete()
-                .in('user_id', conflictUserIds)
-                .eq('group_id', id);
-            } else {
-              // Prompt user with warning modal
-              return NextResponse.json({
-                conflict: true,
-                message: 'Some members belong to other groups with internet access.',
-                conflicts,
-              });
-            }
-          }
+        const conflictRes = await checkAndResolveNoInternetSupabase(supabase, id, conflict_action);
+        if ('protectedConflict' in conflictRes && conflictRes.protectedConflict) {
+          return NextResponse.json({ error: conflictRes.error, protected_conflict: true }, { status: 400 });
+        }
+        if (conflictRes.conflict) {
+          return NextResponse.json({
+            conflict: true,
+            message: conflictRes.message,
+            conflicts: conflictRes.conflicts,
+          });
         }
       }
 
@@ -449,14 +279,13 @@ export async function PATCH(request: Request) {
       await invalidateGroupsAndUsersCache();
       return NextResponse.json({ success: true, group: data });
     } else {
+      // Mock mode
       const state = getMockState();
       const currentGroup = state.mockGroups.find((g) => g.id === id);
-
       if (!currentGroup) {
         return NextResponse.json({ error: 'Group not found' }, { status: 404 });
       }
 
-      // Default group cannot be renamed, protected, or tagged as No Internet
       if (currentGroup.name.toLowerCase() === 'default') {
         if (is_protected === true || is_no_internet === true || (name && name.trim().toLowerCase() !== 'default')) {
           return NextResponse.json(
@@ -466,118 +295,36 @@ export async function PATCH(request: Request) {
         }
       }
 
-      // Incompatibility: cannot be both Protected and No Internet
       if (is_protected === true && (currentGroup.is_no_internet || is_no_internet === true)) {
-        return NextResponse.json(
-          { error: 'A group cannot be both Protected and No Internet.' },
-          { status: 400 }
-        );
+        return NextResponse.json({ error: 'A group cannot be both Protected and No Internet.' }, { status: 400 });
       }
       if (is_no_internet === true && (currentGroup.is_protected || is_protected === true)) {
-        return NextResponse.json(
-          { error: 'A group cannot be both Protected and No Internet.' },
-          { status: 400 }
-        );
+        return NextResponse.json({ error: 'A group cannot be both Protected and No Internet.' }, { status: 400 });
       }
 
-      // If enabling No Internet, check member conflicts
       if (is_no_internet === true) {
-        const members = state.mockUsers.filter((u) => u.groups.some((g) => g.id === id));
-
-        // Check if any member is in a protected group
-        for (const m of members) {
-          const protG = m.groups.find((g) => g.is_protected);
-          if (protG) {
-            return NextResponse.json(
-              {
-                error: `Cannot tag group as No Internet: Member "${m.name}" is currently in protected group "${protG.name}". Administrator must remove the user from the protected group first.`,
-                protected_conflict: true,
-              },
-              { status: 400 }
-            );
-          }
+        const conflictRes = checkAndResolveNoInternetMock(state, id, conflict_action);
+        if ('protectedConflict' in conflictRes && conflictRes.protectedConflict) {
+          return NextResponse.json({ error: conflictRes.error, protected_conflict: true }, { status: 400 });
         }
-
-        // Check multi-group conflicts
-        const conflicts: { userId: string; userName: string; mac: string; otherGroups: string[] }[] = [];
-        for (const m of members) {
-          const otherGs = m.groups.filter((g) => g.id !== id && !g.is_no_internet);
-          if (otherGs.length > 0) {
-            conflicts.push({
-              userId: m.id,
-              userName: m.name,
-              mac: m.mac_address,
-              otherGroups: otherGs.map((g) => g.name),
-            });
-          }
-        }
-
-        if (conflicts.length > 0) {
-          const conflictIds = new Set(conflicts.map((c) => c.userId));
-
-          if (conflict_action === 'force_add') {
-            // Remove conflicting users from all other groups, leaving only this group
-            state.setMockUsers(
-              state.mockUsers.map((u) => {
-                if (conflictIds.has(u.id)) {
-                  return {
-                    ...u,
-                    groups: u.groups.filter((g) => g.id === id),
-                    updated_at: new Date().toISOString(),
-                  };
-                }
-                return u;
-              })
-            );
-          } else if (conflict_action === 'remove_from_group') {
-            // Remove conflicting users from this group, leaving them in their other groups
-            state.setMockUsers(
-              state.mockUsers.map((u) => {
-                if (conflictIds.has(u.id)) {
-                  return {
-                    ...u,
-                    groups: u.groups.filter((g) => g.id !== id),
-                    updated_at: new Date().toISOString(),
-                  };
-                }
-                return u;
-              })
-            );
-          } else {
-            // Prompt user with warning modal
-            return NextResponse.json({
-              conflict: true,
-              message: 'Some members belong to other groups with internet access.',
-              conflicts,
-            });
-          }
+        if (conflictRes.conflict) {
+          return NextResponse.json({
+            conflict: true,
+            message: conflictRes.message,
+            conflicts: conflictRes.conflicts,
+          });
         }
       }
 
-      let updatedGroup: Group | null = null;
-      const newGroups = state.mockGroups.map((g) => {
-        if (g.id === id) {
-          updatedGroup = {
-            ...g,
-            is_protected: is_protected !== undefined ? Boolean(is_protected) : g.is_protected,
-            is_no_internet: is_no_internet !== undefined ? Boolean(is_no_internet) : g.is_no_internet,
-            name: name && typeof name === 'string' ? name.trim() : g.name,
-            updated_at: new Date().toISOString(),
-          };
-          return updatedGroup;
-        }
-        return g;
-      });
+      const updatedGroup: Group = {
+        ...currentGroup,
+        is_protected: is_protected !== undefined ? Boolean(is_protected) : currentGroup.is_protected,
+        is_no_internet: is_no_internet !== undefined ? Boolean(is_no_internet) : currentGroup.is_no_internet,
+        name: name && typeof name === 'string' ? name.trim() : currentGroup.name,
+        updated_at: new Date().toISOString(),
+      };
 
-      state.setMockGroups(newGroups);
-      if (updatedGroup) {
-        state.setMockUsers(
-          state.mockUsers.map((u) => ({
-            ...u,
-            groups: u.groups.map((ug) => (ug.id === id ? { ...ug, ...updatedGroup } : ug)),
-          }))
-        );
-      }
+      state.setMockGroups(state.mockGroups.map((g) => (g.id === id ? updatedGroup : g)));
       await invalidateGroupsAndUsersCache();
       return NextResponse.json({ success: true, group: updatedGroup });
     }

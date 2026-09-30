@@ -126,3 +126,5 @@ export interface UserViewModel {
   draft_change_id?: string;
 }
 
+export type ActiveTab = 'dashboard' | 'users' | 'groups' | 'history' | 'account' | 'settings';
+
