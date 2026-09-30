@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { SessionUser, ActiveTab } from '@/lib/types';
 
 export function useAuthSession() {
@@ -39,12 +39,12 @@ export function useAuthSession() {
   // Notification Toast
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
-  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+  const showToast = useCallback((message: string, type: 'success' | 'error' = 'success') => {
     setNotification({ message, type });
     setTimeout(() => setNotification(null), 4000);
-  };
+  }, []);
 
-  const handleTabChange = (tab: ActiveTab) => {
+  const handleTabChange = useCallback((tab: ActiveTab) => {
     setActiveTab(tab);
     if (typeof window !== 'undefined') {
       try {
@@ -60,7 +60,7 @@ export function useAuthSession() {
         // ignore
       }
     }
-  };
+  }, []);
 
   // Theme Initialization (localStorage & system preference)
   useEffect(() => {

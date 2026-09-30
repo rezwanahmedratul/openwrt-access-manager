@@ -359,30 +359,63 @@
   .actions-col {
     width: 100% !important;
     display: flex !important;
-    flex-direction: column !important;
-    align-items: stretch !important;
+    flex-direction: row !important;
+    flex-wrap: wrap !important;
+    align-items: center !important;
     gap: 0.5rem !important;
   }
 
   .actions-col .btn {
-    width: 100% !important;
-    justify-content: center !important;
-    height: 40px !important;
-    font-size: 0.85rem !important;
-  }
-
-  .header-mac-auth-badge {
-    width: 100% !important;
-    justify-content: center !important;
-    padding: 0.45rem 0.75rem !important;
-    box-sizing: border-box !important;
-  }
-
-  .header-mac-auth-btn {
-    width: 100% !important;
+    flex: 1 1 auto !important;
+    min-width: 130px !important;
     justify-content: center !important;
     height: 38px !important;
     font-size: 0.82rem !important;
+  }
+
+  /* Dashboard Master MAC Auth Banner on Mobile */
+  .dashboard-mac-auth-banner {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 1rem !important;
+    padding: 1rem 1.15rem !important;
+    margin-bottom: 1.15rem !important;
+    border-radius: var(--radius-md) !important;
+  }
+
+  .mac-auth-banner-main {
+    align-items: flex-start !important;
+    gap: 0.85rem !important;
+  }
+
+  .mac-auth-icon-wrapper {
+    width: 38px !important;
+    height: 38px !important;
+  }
+
+  .mac-auth-title {
+    font-size: 0.98rem !important;
+  }
+
+  .mac-auth-subtext {
+    font-size: 0.78rem !important;
+    line-height: 1.35 !important;
+  }
+
+  .mac-auth-timer-pill {
+    font-size: 0.72rem !important;
+    padding: 0.2rem 0.55rem !important;
+  }
+
+  .mac-auth-action-col {
+    width: 100% !important;
+  }
+
+  .mac-auth-toggle-btn {
+    width: 100% !important;
+    height: 42px !important;
+    justify-content: center !important;
+    font-size: 0.86rem !important;
   }
 
   /* Statistics Cards Grid */
@@ -431,6 +464,45 @@
   .stat-footer-text {
     font-size: 0.68rem !important;
     line-height: 1.25 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+
+  /* History Telemetry Grid - Ensure 2x2 grid on mobile, never a vertical list */
+  .history-telemetry-grid {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 0.65rem !important;
+    width: 100% !important;
+    margin-bottom: 0.5rem !important;
+  }
+
+  .history-telemetry-card {
+    padding: 0.8rem 0.85rem !important;
+    border-radius: var(--radius-md) !important;
+    gap: 0.4rem !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+  }
+
+  .history-telemetry-header {
+    font-size: 0.68rem !important;
+    letter-spacing: 0.03em !important;
+    gap: 0.25rem !important;
+  }
+
+  .history-telemetry-value {
+    font-size: 1.25rem !important;
+    gap: 0.35rem !important;
+  }
+
+  .history-telemetry-unit {
+    font-size: 0.72rem !important;
+  }
+
+  .history-telemetry-subtext {
+    font-size: 0.68rem !important;
     white-space: nowrap !important;
     overflow: hidden !important;
     text-overflow: ellipsis !important;

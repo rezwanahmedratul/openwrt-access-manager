@@ -2,9 +2,9 @@
 
 import React from 'react';
 import { DashboardStats, Group, SessionUser, UserViewModel, ActiveTab } from '@/lib/types';
-import { IconClock, IconInfinity } from '../icons';
 import { QuickAddBar } from '../QuickAddBar';
 import { DashboardStatsCards } from '../dashboard/DashboardStatsCards';
+import { DashboardMacAuthCard } from '../dashboard/DashboardMacAuthCard';
 import { DashboardTableCard } from '../dashboard/DashboardTableCard';
 
 interface DashboardViewProps {
@@ -128,17 +128,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 }) => {
   return (
     <div className="tab-pane-container">
-      {/* Top Headline + Master MAC Auth Status Bar */}
-      <div className="dashboard-hero-row">
-        <div>
-          <h1 className="page-headline">Network Access Control</h1>
-          <p className="page-description">
-            Assign devices to firewall groups, manage MAC authentication bypass, and stage changes.
-          </p>
-        </div>
-
-        <div className="header-status-badge-wrap">
-          <div className="gateway-pill">
+      {/* Top Headline */}
+      <div className="header-row dashboard-header-row" style={{ marginBottom: '1.25rem' }}>
+        <div className="title-col">
+          <div className="gateway-pill" style={{ marginBottom: '0.65rem' }}>
             <span
               className="gateway-pill-dot"
               style={{
@@ -146,47 +139,23 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   stats.mac_auth && !stats.mac_auth.enabled ? '#eab308' : '#22c55e',
               }}
             ></span>
-            <span>
-              {stats.mac_auth && !stats.mac_auth.enabled ? (
-                <>
-                  MAC Auth: <strong>Disabled</strong>
-                  {stats.mac_auth.disabled_until && (
-                    <span style={{ marginLeft: '4px', opacity: 0.85 }}>
-                      ({macAuthCountdown || 'Paused'})
-                    </span>
-                  )}
-                </>
-              ) : (
-                'MAC Auth: Enforced'
-              )}
-            </span>
+            <span>Gateway Access Control</span>
           </div>
-
-          {stats.mac_auth && !stats.mac_auth.enabled && stats.mac_auth.disabled_until && (
-            <div className="mac-auth-timer-chip" style={{ fontSize: '0.75rem', padding: '0.2rem 0.55rem' }}>
-              <IconClock size={12} />
-              <span>Expires {formatDateTime(stats.mac_auth.disabled_until)}</span>
-            </div>
-          )}
-
-          {stats.mac_auth && !stats.mac_auth.enabled && !stats.mac_auth.disabled_until && (
-            <div className="mac-auth-timer-chip" style={{ fontSize: '0.75rem', padding: '0.2rem 0.55rem' }}>
-              <IconInfinity size={12} />
-              <span>Permanently Off</span>
-            </div>
-          )}
-
-          <button
-            type="button"
-            className={`btn header-mac-auth-btn ${stats.mac_auth && !stats.mac_auth.enabled ? 'btn-primary' : 'btn-secondary'}`}
-            disabled={isUpdatingMacAuth}
-            onClick={onToggleMacAuthClick}
-            style={{ fontSize: '0.8rem', padding: '0.45rem 0.95rem', fontWeight: 600 }}
-          >
-            {isUpdatingMacAuth ? 'Updating...' : stats.mac_auth && !stats.mac_auth.enabled ? 'Turn ON MAC Auth' : 'Turn OFF MAC Auth'}
-          </button>
+          <h1 className="page-headline">Network Access Control</h1>
+          <p className="page-description">
+            Assign devices to firewall groups, manage MAC authentication bypass, and stage changes.
+          </p>
         </div>
       </div>
+
+      {/* Repositioned & Redesigned Master MAC Auth Security Control Card */}
+      <DashboardMacAuthCard
+        stats={stats}
+        macAuthCountdown={macAuthCountdown}
+        formatDateTime={formatDateTime}
+        isUpdatingMacAuth={isUpdatingMacAuth}
+        onToggleMacAuthClick={onToggleMacAuthClick}
+      />
 
       {/* Statistics Cards Row */}
       <DashboardStatsCards

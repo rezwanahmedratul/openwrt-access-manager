@@ -933,3 +933,231 @@
   border-bottom: none;
 }
 
+/* ============================================================
+   DASHBOARD MASTER MAC AUTHENTICATION SECURITY CARD
+   ============================================================ */
+.dashboard-mac-auth-banner {
+  background: var(--bg-card);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-md);
+  padding: 1.15rem 1.4rem;
+  margin-bottom: 1.25rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1.5rem;
+  box-shadow: var(--shadow-subtle);
+  transition: all var(--transition-fast);
+  position: relative;
+  overflow: hidden;
+}
+
+.dashboard-mac-auth-banner::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: transparent;
+  transition: background-color var(--transition-fast);
+}
+
+.dashboard-mac-auth-banner.is-enabled {
+  border-color: rgba(34, 197, 94, 0.28);
+}
+
+.dashboard-mac-auth-banner.is-enabled::before {
+  background: #22c55e;
+}
+
+.dashboard-mac-auth-banner.is-disabled {
+  border-color: rgba(234, 179, 8, 0.38);
+  background: linear-gradient(to right, rgba(234, 179, 8, 0.04), var(--bg-card) 45%);
+}
+
+.dashboard-mac-auth-banner.is-disabled::before {
+  background: #eab308;
+}
+
+.dashboard-mac-auth-banner:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-card-hover);
+}
+
+.mac-auth-banner-main {
+  display: flex;
+  align-items: center;
+  gap: 1.15rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.mac-auth-icon-wrapper {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all var(--transition-fast);
+}
+
+.mac-auth-icon-wrapper.icon-enabled {
+  background: rgba(34, 197, 94, 0.1);
+  color: #22c55e;
+  border: 1px solid rgba(34, 197, 94, 0.2);
+}
+
+.mac-auth-icon-wrapper.icon-disabled {
+  background: rgba(234, 179, 8, 0.12);
+  color: #eab308;
+  border: 1px solid rgba(234, 179, 8, 0.25);
+}
+
+.mac-auth-status-dot {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  border: 2px solid var(--bg-card);
+}
+
+.mac-auth-status-dot.dot-enabled {
+  background-color: #22c55e;
+  box-shadow: 0 0 6px rgba(34, 197, 94, 0.6);
+  animation: pulseRing 2s ease infinite;
+}
+
+.mac-auth-status-dot.dot-disabled {
+  background-color: #eab308;
+  box-shadow: 0 0 6px rgba(234, 179, 8, 0.6);
+  animation: pulseRing 1.5s ease infinite;
+}
+
+.mac-auth-text-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.mac-auth-header-line {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+}
+
+.mac-auth-title {
+  margin: 0;
+  font-size: 1.02rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.02em;
+}
+
+.mac-auth-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.18rem 0.6rem;
+  border-radius: var(--radius-pill);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.mac-auth-status-badge.badge-enforced {
+  background: rgba(34, 197, 94, 0.12);
+  color: #16a34a;
+  border: 1px solid rgba(34, 197, 94, 0.25);
+}
+
+[data-theme='dark'] .mac-auth-status-badge.badge-enforced {
+  background: rgba(34, 197, 94, 0.18);
+  color: #4ade80;
+}
+
+.mac-auth-status-badge.badge-bypassed {
+  background: rgba(234, 179, 8, 0.12);
+  color: #ca8a04;
+  border: 1px solid rgba(234, 179, 8, 0.3);
+}
+
+[data-theme='dark'] .mac-auth-status-badge.badge-bypassed {
+  background: rgba(234, 179, 8, 0.18);
+  color: #facc15;
+}
+
+.mac-auth-subtext {
+  margin: 0;
+  font-size: 0.81rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+.mac-auth-subtext code {
+  font-family: var(--font-mono);
+  background: var(--bg-pill);
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+  border: 1px solid var(--border-subtle);
+  font-size: 0.76rem;
+}
+
+.mac-auth-schedule-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.3rem;
+  flex-wrap: wrap;
+}
+
+.mac-auth-timer-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: rgba(234, 179, 8, 0.1);
+  color: var(--text-primary);
+  border: 1px solid rgba(234, 179, 8, 0.25);
+  border-radius: var(--radius-pill);
+  padding: 0.22rem 0.65rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.mac-auth-timer-pill.pill-permanent {
+  background: var(--bg-hover);
+  border-color: var(--border-subtle);
+  color: var(--text-secondary);
+}
+
+.mac-auth-action-col {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.mac-auth-toggle-btn {
+  padding: 0.55rem 1.2rem;
+  font-size: 0.84rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+  transition: all var(--transition-fast);
+}
+
+.mac-auth-toggle-btn:hover {
+  transform: translateY(-1px);
+}
+
+

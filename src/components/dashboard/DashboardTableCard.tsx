@@ -1,15 +1,14 @@
-'use client';
-
 import React from 'react';
 import { Group, SessionUser, UserViewModel, ActiveTab } from '@/lib/types';
 import { UserRow } from '../UserRow';
+import { UserCardMobile } from '../UserCardMobile';
 
-interface DashboardTableCardProps {
-  users: UserViewModel[];
+export interface DashboardTableCardProps {
   displayedUsers: UserViewModel[];
-  paginatedDashboardUsers: UserViewModel[];
+  users: UserViewModel[];
+  paginatedDashboardUsers?: UserViewModel[];
   dashboardPage: number;
-  setDashboardPage: React.Dispatch<React.SetStateAction<number>>;
+  setDashboardPage: (p: number | ((prev: number) => number)) => void;
   dashboardTotalPages: number;
   dashboardPageSize: number;
   search: string;
@@ -42,8 +41,8 @@ interface DashboardTableCardProps {
 }
 
 export const DashboardTableCard: React.FC<DashboardTableCardProps> = ({
-  users,
   displayedUsers,
+  users,
   paginatedDashboardUsers,
   dashboardPage,
   setDashboardPage,
@@ -77,11 +76,16 @@ export const DashboardTableCard: React.FC<DashboardTableCardProps> = ({
   onTabChange,
   loading,
 }) => {
+  const usersToRender =
+    paginatedDashboardUsers ||
+    displayedUsers.slice((dashboardPage - 1) * dashboardPageSize, dashboardPage * dashboardPageSize);
+
   return (
     <div className="table-card-container">
+      {/* Search & Filter Header */}
       <div className="table-header-tools">
         <div className="search-input-wrapper">
-          <svg className="search-input-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg className="search-input-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <circle cx="11" cy="11" r="8" />
             <line x1="21" y1="21" x2="16.65" y2="16.65" />
           </svg>
@@ -108,36 +112,38 @@ export const DashboardTableCard: React.FC<DashboardTableCardProps> = ({
           )}
         </div>
 
-        <select
-          className="group-dropdown-select"
-          value={selectedGroup}
-          onChange={(e) => setSelectedGroup(e.target.value)}
-        >
-          <option value="ALL">All Groups</option>
-          {groups.map((g) => (
-            <option key={g.id} value={g.id}>
-              {g.name} {g.is_no_internet ? '(No Internet)' : ''}
-            </option>
-          ))}
-        </select>
+        <div className="table-header-filters-row">
+          <select
+            className="group-dropdown-select"
+            value={selectedGroup}
+            onChange={(e) => setSelectedGroup(e.target.value)}
+          >
+            <option value="ALL">All Groups</option>
+            {groups.map((g) => (
+              <option key={g.id} value={g.id}>
+                {g.name} {g.is_no_internet ? '(No Internet)' : ''}
+              </option>
+            ))}
+          </select>
 
-        <button
-          type="button"
-          className="btn btn-ghost btn-sm"
-          onClick={onRefreshData}
-          title="Refresh data"
-          style={{ padding: '0.45rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-        >
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <polyline points="1 4 1 10 7 10" />
-            <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
-          </svg>
-        </button>
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm refresh-btn-icon"
+            onClick={onRefreshData}
+            title="Refresh data"
+            aria-label="Refresh data"
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="1 4 1 10 7 10" />
+              <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+            </svg>
+          </button>
+        </div>
       </div>
 
-      {/* Status Filter Chips + Results Count + Actions */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.65rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+      {/* Subtoolbar: Status Filter Chips + Results Count + Actions */}
+      <div className="table-subtoolbar">
+        <div className="status-chips-scroll-container">
           {(['all', 'applied', 'added', 'modified', 'deleted'] as const).map((status) => {
             const counts: Record<string, number> = {
               all: users.length,
@@ -161,206 +167,245 @@ export const DashboardTableCard: React.FC<DashboardTableCardProps> = ({
           })}
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-          <span style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>
+        <div className="table-actions-toolbar">
+          <span className="table-results-counter">
             {displayedUsers.length === users.length
               ? `${users.length} users`
               : `${displayedUsers.length} of ${users.length}`}
           </span>
 
-          <button
-            type="button"
-            className="btn btn-secondary btn-sm"
-            onClick={() => onTabChange('users')}
-            style={{ fontSize: '0.75rem', padding: '0.3rem 0.65rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
-            title="Open dedicated page with all users"
-          >
-            <span>See All ({users.length})</span>
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <line x1="5" y1="12" x2="19" y2="12" />
-              <polyline points="12 5 19 12 12 19" />
-            </svg>
-          </button>
+          <div className="table-action-buttons-group">
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={() => onTabChange('users')}
+              style={{ fontSize: '0.75rem', padding: '0.35rem 0.65rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+              title="Open dedicated page with all users"
+            >
+              <span>See All ({users.length})</span>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="5" y1="12" x2="19" y2="12" />
+                <polyline points="12 5 19 12 12 19" />
+              </svg>
+            </button>
 
-          <button
-            type="button"
-            className="btn btn-ghost btn-sm"
-            onClick={onExportCSV}
-            style={{ fontSize: '0.75rem', padding: '0.3rem 0.65rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
-            title="Export all users as CSV"
-          >
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-              <polyline points="7 10 12 15 17 10" />
-              <line x1="12" y1="15" x2="12" y2="3" />
-            </svg>
-            <span>CSV</span>
-          </button>
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              onClick={onExportCSV}
+              style={{ fontSize: '0.75rem', padding: '0.35rem 0.65rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
+              title="Export all users as CSV"
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
+              <span>CSV</span>
+            </button>
 
-          <button
-            type="button"
-            className="btn btn-ghost btn-sm"
-            onClick={onOpenImportModal}
-            style={{ fontSize: '0.75rem', padding: '0.3rem 0.65rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
-            title="Batch import devices from CSV or text"
-          >
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-              <polyline points="17 8 12 3 7 8" />
-              <line x1="12" y1="3" x2="12" y2="15" />
-            </svg>
-            <span>Import</span>
-          </button>
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              onClick={onOpenImportModal}
+              style={{ fontSize: '0.75rem', padding: '0.35rem 0.65rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
+              title="Batch import devices from CSV or text"
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="17 8 12 3 7 8" />
+                <line x1="12" y1="3" x2="12" y2="15" />
+              </svg>
+              <span>Import</span>
+            </button>
 
-          <button
-            type="button"
-            className={`btn btn-sm ${isSelectionMode ? 'btn-primary' : 'btn-ghost'}`}
-            onClick={onToggleSelectionMode}
-            style={{
-              fontSize: '0.75rem',
-              padding: '0.3rem 0.65rem',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.3rem',
-            }}
-            title={isSelectionMode ? 'Exit selection mode' : 'Select multiple devices'}
-          >
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              {isSelectionMode ? (
-                <polyline points="20 6 9 17 4 12" />
-              ) : (
-                <>
-                  <rect x="3" y="3" width="18" height="18" rx="2" />
-                  <path d="m9 12 2 2 4-4" />
-                </>
-              )}
-            </svg>
-            <span>{isSelectionMode ? 'Done' : 'Select'}</span>
-          </button>
+            <button
+              type="button"
+              className={`btn btn-sm ${isSelectionMode ? 'btn-primary' : 'btn-ghost'}`}
+              onClick={onToggleSelectionMode}
+              style={{
+                fontSize: '0.75rem',
+                padding: '0.35rem 0.65rem',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.3rem',
+              }}
+              title={isSelectionMode ? 'Exit selection mode' : 'Select multiple devices'}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                {isSelectionMode ? (
+                  <polyline points="20 6 9 17 4 12" />
+                ) : (
+                  <>
+                    <rect x="3" y="3" width="18" height="18" rx="2" />
+                    <path d="m9 12 2 2 4-4" />
+                  </>
+                )}
+              </svg>
+              <span>{isSelectionMode ? 'Done' : 'Select'}</span>
+            </button>
 
-          {isSelectionMode && selectedUserIds.size > 0 && (
-            <>
-              <button
-                type="button"
-                className="btn btn-ghost btn-sm"
-                onClick={onOpenBulkGroupModal}
-                style={{ fontSize: '0.75rem', padding: '0.3rem 0.65rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
-                title="Assign selected users to group"
-              >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                  <circle cx="9" cy="7" r="4" />
-                  <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                  <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                </svg>
-                <span>Group ({selectedUserIds.size})</span>
-              </button>
+            {isSelectionMode && selectedUserIds.size > 0 && (
+              <>
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  onClick={onOpenBulkGroupModal}
+                  style={{ fontSize: '0.75rem', padding: '0.35rem 0.65rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
+                  title="Assign selected users to group"
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                    <circle cx="9" cy="7" r="4" />
+                    <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                  </svg>
+                  <span>Group ({selectedUserIds.size})</span>
+                </button>
 
-              <button
-                type="button"
-                className="btn btn-ghost btn-sm"
-                onClick={onBulkDelete}
-                style={{ fontSize: '0.75rem', padding: '0.3rem 0.65rem', color: '#ef4444', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
-                title="Delete selected users"
-              >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <polyline points="3 6 5 6 21 6" />
-                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                </svg>
-                <span>Delete ({selectedUserIds.size})</span>
-              </button>
-            </>
-          )}
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  onClick={onBulkDelete}
+                  style={{ fontSize: '0.75rem', padding: '0.35rem 0.65rem', color: '#ef4444', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
+                  title="Delete selected users"
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <polyline points="3 6 5 6 21 6" />
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                  </svg>
+                  <span>Delete ({selectedUserIds.size})</span>
+                </button>
+              </>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* User Table */}
-      <table className="data-table">
-        <thead>
-          <tr>
-            {isSelectionMode && (
-              <th className="cell-checkbox" style={{ width: '44px', padding: '0.75rem 0.5rem 0.75rem 1rem' }}>
-                <input
-                  type="checkbox"
-                  checked={selectableUsers.length > 0 && selectedUserIds.size === selectableUsers.length}
-                  onChange={onToggleSelectAll}
-                  disabled={selectableUsers.length === 0}
-                  style={{ cursor: selectableUsers.length === 0 ? 'not-allowed' : 'pointer', width: '15px', height: '15px', accentColor: 'var(--text-primary)' }}
-                  title={selectableUsers.length === 0 ? 'No selectable users' : 'Select all'}
-                />
-              </th>
-            )}
-            <th
-              style={{ width: '130px', cursor: 'pointer', userSelect: 'none' }}
-              onClick={() => onSortToggle('status')}
-              title="Sort by status"
-            >
-              STATUS{renderSortArrow('status')}
-            </th>
-            <th
-              style={{ cursor: 'pointer', userSelect: 'none' }}
-              onClick={() => onSortToggle('name')}
-              title="Sort by name"
-            >
-              NAME{renderSortArrow('name')}
-            </th>
-            <th
-              style={{ cursor: 'pointer', userSelect: 'none' }}
-              onClick={() => onSortToggle('mac_address')}
-              title="Sort by MAC"
-            >
-              MAC ADDRESS{renderSortArrow('mac_address')}
-            </th>
-            <th>ASSIGNED GROUPS</th>
-            <th style={{ textAlign: 'right', width: '150px' }}>ACTIONS</th>
-          </tr>
-        </thead>
-        <tbody>
-          {displayedUsers.length === 0 ? (
+      {/* Desktop Table View */}
+      <div className="desktop-table-container">
+        <table className="data-table">
+          <thead>
             <tr>
-              <td colSpan={isSelectionMode ? 6 : 5} style={{ textAlign: 'center', padding: '3.5rem' }}>
-                {loading ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem' }}>
-                    <div className="loading-spinner"></div>
-                    <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Loading users...</span>
-                  </div>
-                ) : (
-                  <div className="empty-state">
-                    <div className="empty-state-icon">
-                      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                        <circle cx="9" cy="7" r="4" />
-                        <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                      </svg>
-                    </div>
-                    <span className="empty-state-text">No users found</span>
-                    <span className="empty-state-hint">{search ? 'Try a different search query' : 'Register a device using the form above'}</span>
-                  </div>
-                )}
-              </td>
+              {isSelectionMode && (
+                <th className="cell-checkbox" style={{ width: '44px', padding: '0.75rem 0.5rem 0.75rem 1rem' }}>
+                  <input
+                    type="checkbox"
+                    checked={selectableUsers.length > 0 && selectedUserIds.size === selectableUsers.length}
+                    onChange={onToggleSelectAll}
+                    disabled={selectableUsers.length === 0}
+                    style={{ cursor: selectableUsers.length === 0 ? 'not-allowed' : 'pointer', width: '16px', height: '16px', accentColor: 'var(--text-primary)' }}
+                    title={selectableUsers.length === 0 ? 'No selectable users' : 'Select all'}
+                  />
+                </th>
+              )}
+              <th
+                style={{ width: '130px', cursor: 'pointer', userSelect: 'none' }}
+                onClick={() => onSortToggle('status')}
+                title="Sort by status"
+              >
+                STATUS{renderSortArrow('status')}
+              </th>
+              <th
+                style={{ cursor: 'pointer', userSelect: 'none' }}
+                onClick={() => onSortToggle('name')}
+                title="Sort by name"
+              >
+                NAME{renderSortArrow('name')}
+              </th>
+              <th
+                style={{ cursor: 'pointer', userSelect: 'none' }}
+                onClick={() => onSortToggle('mac_address')}
+                title="Sort by MAC"
+              >
+                MAC ADDRESS{renderSortArrow('mac_address')}
+              </th>
+              <th>ASSIGNED GROUPS</th>
+              <th style={{ textAlign: 'right', width: '140px' }}>ACTIONS</th>
             </tr>
-          ) : (
-            paginatedDashboardUsers.map((u) => (
-              <UserRow
-                key={u.id}
-                user={u}
-                isSelectionMode={isSelectionMode}
-                isSelected={selectedUserIds.has(u.id)}
-                currentUser={currentUser}
-                copiedMac={copiedMac}
-                onToggleSelect={onToggleSelectUser}
-                onCopyMac={onCopyMac}
-                onSelectGroup={setSelectedGroup}
-                onEdit={onEditUser}
-                onDelete={onDeleteUser}
-              />
-            ))
-          )}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {displayedUsers.length === 0 ? (
+              <tr>
+                <td colSpan={isSelectionMode ? 6 : 5} style={{ textAlign: 'center', padding: '3.5rem' }}>
+                  {loading ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem' }}>
+                      <div className="loading-spinner"></div>
+                      <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Loading users...</span>
+                    </div>
+                  ) : (
+                    <div className="empty-state">
+                      <div className="empty-state-icon">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                          <circle cx="9" cy="7" r="4" />
+                          <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                          <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                        </svg>
+                      </div>
+                      <span className="empty-state-text">No users found</span>
+                      <span className="empty-state-hint">{search ? 'Try a different search query' : 'Register a device or clear filters'}</span>
+                    </div>
+                  )}
+                </td>
+              </tr>
+            ) : (
+              usersToRender.map((u) => (
+                <UserRow
+                  key={u.id}
+                  user={u}
+                  isSelectionMode={isSelectionMode}
+                  isSelected={selectedUserIds.has(u.id)}
+                  currentUser={currentUser}
+                  copiedMac={copiedMac}
+                  onToggleSelect={onToggleSelectUser}
+                  onCopyMac={onCopyMac}
+                  onSelectGroup={setSelectedGroup}
+                  onEdit={onEditUser}
+                  onDelete={onDeleteUser}
+                />
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
 
-      {/* Dashboard Pagination Bar & See All Users Button */}
+      {/* Mobile Device Cards View (< 768px) */}
+      <div className="mobile-cards-container">
+        {displayedUsers.length === 0 ? (
+          <div style={{ padding: '2.5rem 1rem', textAlign: 'center' }}>
+            {loading ? (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem' }}>
+                <div className="loading-spinner"></div>
+                <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Loading users...</span>
+              </div>
+            ) : (
+              <div className="empty-state">
+                <span className="empty-state-text">No users found</span>
+                <span className="empty-state-hint">{search ? 'Try a different search query' : 'Register a device or clear filters'}</span>
+              </div>
+            )}
+          </div>
+        ) : (
+          usersToRender.map((u) => (
+            <UserCardMobile
+              key={u.id}
+              user={u}
+              isSelectionMode={isSelectionMode}
+              isSelected={selectedUserIds.has(u.id)}
+              currentUser={currentUser}
+              copiedMac={copiedMac}
+              onToggleSelect={onToggleSelectUser}
+              onCopyMac={onCopyMac}
+              onSelectGroup={setSelectedGroup}
+              onEdit={onEditUser}
+              onDelete={onDeleteUser}
+            />
+          ))
+        )}
+      </div>
+
+      {/* Pagination Controls */}
       <div
         style={{
           display: 'flex',
@@ -373,63 +418,64 @@ export const DashboardTableCard: React.FC<DashboardTableCardProps> = ({
           gap: '0.75rem',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-          <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-            Showing {displayedUsers.length === 0 ? 0 : (dashboardPage - 1) * dashboardPageSize + 1}–{Math.min(dashboardPage * dashboardPageSize, displayedUsers.length)} of {displayedUsers.length} users
-          </span>
-          <button
-            type="button"
-            className="btn btn-secondary btn-sm"
-            onClick={() => onTabChange('users')}
-            style={{ fontSize: '0.76rem', padding: '0.3rem 0.65rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
-            title="Open dedicated page with all users"
-          >
-            <span>See All Users ({users.length})</span>
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <line x1="5" y1="12" x2="19" y2="12" />
-              <polyline points="12 5 19 12 12 19" />
-            </svg>
-          </button>
+        <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+          {displayedUsers.length > 0 ? (
+            <>
+              Showing <strong>{(dashboardPage - 1) * dashboardPageSize + 1}</strong>–
+              <strong>{Math.min(dashboardPage * dashboardPageSize, displayedUsers.length)}</strong> of{' '}
+              <strong>{displayedUsers.length}</strong> devices
+              {displayedUsers.length !== users.length && ` (filtered from ${users.length})`}
+            </>
+          ) : (
+            '0 devices'
+          )}
         </div>
 
         {dashboardTotalPages > 1 && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
             <button
               type="button"
               className="btn btn-secondary btn-sm"
               disabled={dashboardPage <= 1}
-              onClick={() => setDashboardPage((p) => Math.max(1, p - 1))}
-              style={{ fontSize: '0.76rem', padding: '0.3rem 0.6rem' }}
+              onClick={() => setDashboardPage((p: number) => Math.max(1, p - 1))}
+              style={{ padding: '0.35rem 0.65rem' }}
             >
               ← Prev
             </button>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
-              {Array.from({ length: dashboardTotalPages }, (_, i) => i + 1).map((pageNum) => (
-                <button
-                  key={pageNum}
-                  type="button"
-                  className={`btn btn-sm ${dashboardPage === pageNum ? 'btn-primary' : 'btn-ghost'}`}
-                  onClick={() => setDashboardPage(pageNum)}
-                  style={{
-                    minWidth: '26px',
-                    height: '26px',
-                    padding: '0 0.3rem',
-                    fontSize: '0.75rem',
-                    fontWeight: dashboardPage === pageNum ? 700 : 500,
-                  }}
-                >
-                  {pageNum}
-                </button>
-              ))}
-            </div>
+            {Array.from({ length: dashboardTotalPages }, (_, i) => i + 1)
+              .filter((p) => p === 1 || p === dashboardTotalPages || Math.abs(p - dashboardPage) <= 1)
+              .reduce((acc: (number | string)[], p, idx, arr) => {
+                if (idx > 0 && p - (arr[idx - 1] as number) > 1) {
+                  acc.push('...');
+                }
+                acc.push(p);
+                return acc;
+              }, [])
+              .map((item, idx) =>
+                item === '...' ? (
+                  <span key={`ellipsis-${idx}`} style={{ padding: '0 0.3rem', color: 'var(--text-muted)' }}>
+                    …
+                  </span>
+                ) : (
+                  <button
+                    key={item}
+                    type="button"
+                    className={`btn btn-sm ${dashboardPage === item ? 'btn-primary' : 'btn-secondary'}`}
+                    onClick={() => setDashboardPage(Number(item))}
+                    style={{ minWidth: '32px', padding: '0.35rem' }}
+                  >
+                    {item}
+                  </button>
+                )
+              )}
 
             <button
               type="button"
               className="btn btn-secondary btn-sm"
               disabled={dashboardPage >= dashboardTotalPages}
-              onClick={() => setDashboardPage((p) => Math.min(dashboardTotalPages, p + 1))}
-              style={{ fontSize: '0.76rem', padding: '0.3rem 0.6rem' }}
+              onClick={() => setDashboardPage((p: number) => Math.min(dashboardTotalPages, p + 1))}
+              style={{ padding: '0.35rem 0.65rem' }}
             >
               Next →
             </button>

@@ -14,6 +14,7 @@ interface HistoryInspectorCardProps {
   copiedContentTab: string | null;
   onCopyToClipboard: (text: string, id: string, isContentTab?: boolean) => void;
   onDownloadFile: (content: string, filename: string) => void;
+  onBackToList?: () => void;
 }
 
 export const HistoryInspectorCard: React.FC<HistoryInspectorCardProps> = ({
@@ -26,6 +27,7 @@ export const HistoryInspectorCard: React.FC<HistoryInspectorCardProps> = ({
   copiedContentTab,
   onCopyToClipboard,
   onDownloadFile,
+  onBackToList,
 }) => {
   return (
     <div className="history-inspector-card">
@@ -33,6 +35,25 @@ export const HistoryInspectorCard: React.FC<HistoryInspectorCardProps> = ({
         <>
           {/* Inspector Header */}
           <div className="history-inspector-header">
+            {onBackToList && (
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm history-back-to-list-btn"
+                onClick={onBackToList}
+                style={{
+                  alignSelf: 'flex-start',
+                  fontSize: '0.76rem',
+                  padding: '0.35rem 0.65rem',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.35rem',
+                  marginBottom: '0.25rem',
+                }}
+              >
+                <span>← Back to Releases List</span>
+              </button>
+            )}
+
             <div className="history-inspector-header-top">
               <div className="history-inspector-title">
                 <span>Release v{selectedHistoryItem.version}</span>
@@ -42,7 +63,7 @@ export const HistoryInspectorCard: React.FC<HistoryInspectorCardProps> = ({
                   <span className="history-archived-pill">Archived Version</span>
                 )}
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <div className="history-inspector-actions-row">
                 <button
                   type="button"
                   className="btn btn-secondary btn-sm"
@@ -88,16 +109,16 @@ export const HistoryInspectorCard: React.FC<HistoryInspectorCardProps> = ({
             </div>
 
             {/* Inspector Meta Subline */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', fontSize: '0.76rem', color: 'var(--text-secondary)', flexWrap: 'wrap' }}>
+            <div className="history-inspector-meta-subline">
               <div>
                 <strong>Published:</strong> {new Date(selectedHistoryItem.created_at).toLocaleString()}
               </div>
               <div>
                 <strong>Devices:</strong> {selectedHistoryItem.user_count} rules compiled
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', minWidth: 0 }}>
                 <strong>SHA-256:</strong>
-                <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.72rem', color: 'var(--text-primary)' }}>
+                <span className="history-hash-chip" style={{ wordBreak: 'break-all' }}>
                   {selectedHistoryItem.hash}
                 </span>
               </div>
@@ -115,7 +136,8 @@ export const HistoryInspectorCard: React.FC<HistoryInspectorCardProps> = ({
                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
                 <polyline points="14 2 14 8 20 8" />
               </svg>
-              <span>Firewall Rules (/etc/config/firewall)</span>
+              <span className="tab-label-desktop">Firewall Rules (/etc/config/firewall)</span>
+              <span className="tab-label-mobile">Firewall</span>
             </button>
             <button
               type="button"
@@ -127,7 +149,8 @@ export const HistoryInspectorCard: React.FC<HistoryInspectorCardProps> = ({
                 <line x1="8" y1="21" x2="16" y2="21" />
                 <line x1="12" y1="17" x2="12" y2="21" />
               </svg>
-              <span>Ethers Map (/etc/ethers)</span>
+              <span className="tab-label-desktop">Ethers Map (/etc/ethers)</span>
+              <span className="tab-label-mobile">Ethers</span>
             </button>
             <button
               type="button"
@@ -140,7 +163,8 @@ export const HistoryInspectorCard: React.FC<HistoryInspectorCardProps> = ({
                 <path d="M13 6h3a2 2 0 0 1 2 2v7" />
                 <line x1="6" y1="9" x2="6" y2="21" />
               </svg>
-              <span>Compare vs Live</span>
+              <span className="tab-label-desktop">Compare vs Live</span>
+              <span className="tab-label-mobile">Diff</span>
             </button>
             <button
               type="button"
@@ -152,14 +176,15 @@ export const HistoryInspectorCard: React.FC<HistoryInspectorCardProps> = ({
                 <line x1="12" y1="16" x2="12" y2="12" />
                 <line x1="12" y1="8" x2="12.01" y2="8" />
               </svg>
-              <span>Audit Properties</span>
+              <span className="tab-label-desktop">Audit Properties</span>
+              <span className="tab-label-mobile">Metadata</span>
             </button>
           </div>
 
           {/* Inspector Content Panes */}
           {historyViewerTab === 'firewall' && (
             <div style={{ position: 'relative' }}>
-              <div style={{ position: 'absolute', top: '1.5rem', right: '1.5rem', zIndex: 2 }}>
+              <div style={{ position: 'absolute', top: '1rem', right: '1rem', zIndex: 2 }}>
                 <button
                   type="button"
                   className="history-copy-btn"
@@ -182,7 +207,7 @@ export const HistoryInspectorCard: React.FC<HistoryInspectorCardProps> = ({
 
           {historyViewerTab === 'ethers' && (
             <div style={{ position: 'relative' }}>
-              <div style={{ position: 'absolute', top: '1.5rem', right: '1.5rem', zIndex: 2 }}>
+              <div style={{ position: 'absolute', top: '1rem', right: '1rem', zIndex: 2 }}>
                 <button
                   type="button"
                   className="history-copy-btn"
@@ -211,7 +236,7 @@ export const HistoryInspectorCard: React.FC<HistoryInspectorCardProps> = ({
                     This is the currently active Live Release (v{selectedHistoryItem.version})
                   </div>
                   <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                    To inspect diffs, select an archived historical release from the list on the left to see what changed compared to this live release.
+                    To inspect diffs, select an archived historical release from the list to see what changed compared to this live release.
                   </p>
                 </div>
               ) : (

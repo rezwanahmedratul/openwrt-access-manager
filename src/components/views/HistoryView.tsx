@@ -8,20 +8,18 @@ import { HistoryInspectorCard } from '../history/HistoryInspectorCard';
 
 interface HistoryViewProps {
   historyList: any[];
-  historyLoading: boolean;
+  historyLoading?: boolean;
   liveHistoryItem: any;
   stats: DashboardStats;
-  onFetchHistory: () => void;
+  onFetchHistory?: () => void;
   onTabChange: (tab: ActiveTab) => void;
   onShowToast: (msg: string) => void;
 }
 
 export const HistoryView: React.FC<HistoryViewProps> = ({
   historyList,
-  historyLoading,
   liveHistoryItem,
   stats,
-  onFetchHistory,
   onTabChange,
   onShowToast,
 }) => {
@@ -33,6 +31,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
   const [historyViewerTab, setHistoryViewerTab] = useState<'firewall' | 'ethers' | 'diff' | 'metadata'>('firewall');
   const [copiedHashId, setCopiedHashId] = useState<string | null>(null);
   const [copiedContentTab, setCopiedContentTab] = useState<string | null>(null);
+  const [mobileActiveTab, setMobileActiveTab] = useState<'list' | 'inspector'>('list');
 
   // Sync selected item if history changes and no selection exists
   React.useEffect(() => {
@@ -107,15 +106,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
             Immutable chronological audit log of published gateway releases, SHA-256 integrity checksums, and configuration snapshots.
           </p>
         </div>
-        <div className="actions-col" style={{ display: 'flex', gap: '0.65rem', flexWrap: 'wrap' }}>
-          <button
-            type="button"
-            className="btn btn-secondary btn-sm"
-            onClick={onFetchHistory}
-            disabled={historyLoading}
-          >
-            {historyLoading ? 'Refreshing...' : 'Refresh History'}
-          </button>
+        <div className="actions-col history-header-actions">
           <a
             href="/api/config/firewall?download=true"
             download="firewall"
@@ -147,9 +138,9 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
 
       {/* Search & Filter Toolbar */}
       <div className="history-filter-card">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1, flexWrap: 'wrap' }}>
+        <div className="history-filter-controls">
           <div className="history-search-input-wrap">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="history-search-icon">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="history-search-icon">
               <circle cx="11" cy="11" r="8" />
               <line x1="21" y1="21" x2="16.65" y2="16.65" />
             </svg>
@@ -160,6 +151,20 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
               value={historySearch}
               onChange={(e) => setHistorySearch(e.target.value)}
             />
+            {historySearch && (
+              <button
+                type="button"
+                className="search-clear-btn"
+                onClick={() => setHistorySearch('')}
+                title="Clear search"
+                aria-label="Clear search"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            )}
           </div>
 
           <div className="history-chip-group">
@@ -187,30 +192,70 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
           </div>
         </div>
 
-        <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+        <div className="history-results-count">
           Showing <strong>{filteredHistory.length}</strong> of {historyList.length} releases
         </div>
       </div>
 
-      {/* Master-Detail Split: Left Ledger Table & Right Inspector */}
-      <div className="history-split-layout">
-        <HistoryLedgerList
-          filteredHistory={filteredHistory}
-          selectedHistoryItem={selectedHistoryItem}
-          onSelectHistoryItem={setSelectedHistoryItem}
-        />
+      {/* Mobile Master-Detail Segmented Tabs (Visible on mobile/tablet) */}
+      <div className="history-mobile-tabs-bar">
+        <button
+          type="button"
+          className={`history-mobile-tab-pill ${mobileActiveTab === 'list' ? 'is-active' : ''}`}
+          onClick={() => setMobileActiveTab('list')}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <line x1="8" y1="6" x2="21" y2="6" />
+            <line x1="8" y1="12" x2="21" y2="12" />
+            <line x1="8" y1="18" x2="21" y2="18" />
+            <line x1="3" y1="6" x2="3.01" y2="6" />
+            <line x1="3" y1="12" x2="3.01" y2="12" />
+            <line x1="3" y1="18" x2="3.01" y2="18" />
+          </svg>
+          <span>Releases List ({filteredHistory.length})</span>
+        </button>
 
-        <HistoryInspectorCard
-          selectedHistoryItem={selectedHistoryItem}
-          liveHistoryItem={liveHistoryItem}
-          stats={stats}
-          historyViewerTab={historyViewerTab}
-          setHistoryViewerTab={setHistoryViewerTab}
-          copiedHashId={copiedHashId}
-          copiedContentTab={copiedContentTab}
-          onCopyToClipboard={copyToClipboard}
-          onDownloadFile={downloadHistoryFile}
-        />
+        <button
+          type="button"
+          className={`history-mobile-tab-pill ${mobileActiveTab === 'inspector' ? 'is-active' : ''}`}
+          onClick={() => setMobileActiveTab('inspector')}
+          disabled={!selectedHistoryItem}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="11" cy="11" r="8" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
+          <span>Inspector {selectedHistoryItem ? `(v${selectedHistoryItem.version})` : ''}</span>
+        </button>
+      </div>
+
+      {/* Master-Detail Split: Left Ledger Table & Right Inspector */}
+      <div className={`history-split-layout mobile-show-${mobileActiveTab}`}>
+        <div className="history-ledger-column">
+          <HistoryLedgerList
+            filteredHistory={filteredHistory}
+            selectedHistoryItem={selectedHistoryItem}
+            onSelectHistoryItem={(item) => {
+              setSelectedHistoryItem(item);
+              setMobileActiveTab('inspector');
+            }}
+          />
+        </div>
+
+        <div className="history-inspector-column">
+          <HistoryInspectorCard
+            selectedHistoryItem={selectedHistoryItem}
+            liveHistoryItem={liveHistoryItem}
+            stats={stats}
+            historyViewerTab={historyViewerTab}
+            setHistoryViewerTab={setHistoryViewerTab}
+            copiedHashId={copiedHashId}
+            copiedContentTab={copiedContentTab}
+            onCopyToClipboard={copyToClipboard}
+            onDownloadFile={downloadHistoryFile}
+            onBackToList={() => setMobileActiveTab('list')}
+          />
+        </div>
       </div>
     </div>
   );

@@ -9,7 +9,7 @@ interface UsersStatsRibbonProps {
 
 export const UsersStatsRibbon: React.FC<UsersStatsRibbonProps> = ({ users }) => {
   return (
-    <div className="stats-grid-row" style={{ marginBottom: '1.25rem' }}>
+    <div className="stats-cards-row stats-grid-row" style={{ marginBottom: '1.25rem' }}>
       <div className="stat-card-box">
         <div className="stat-top-row">
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>

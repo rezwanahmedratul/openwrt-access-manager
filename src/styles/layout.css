@@ -569,7 +569,8 @@
 /* ============================================================
    STATISTICS CARDS (4 EQUAL CARDS IN ONE ROW - FULL WIDTH GRID)
    ============================================================ */
-.stats-cards-row {
+.stats-cards-row,
+.stats-grid-row {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 1.25rem;
@@ -578,14 +579,19 @@
 }
 
 @media (max-width: 1200px) {
-  .stats-cards-row {
+  .stats-cards-row,
+  .stats-grid-row {
     grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
   }
 }
 
 @media (max-width: 640px) {
-  .stats-cards-row {
-    grid-template-columns: 1fr;
+  .stats-cards-row,
+  .stats-grid-row {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.65rem;
+    margin-bottom: 1.25rem;
   }
 }
 
