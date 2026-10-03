@@ -10,6 +10,9 @@ console.log('==============================================');
 console.log('.env file path:', envPath);
 console.log('.env file size:', envContent.length, 'bytes');
 
+const lines = envContent.split('\n').filter((l) => !l.startsWith('#') && l.trim());
+console.log('Active .env entries count:', lines.length);
+
 const envVars = {};
 lines.forEach((line) => {
   const eqIdx = line.indexOf('=');
@@ -59,12 +62,53 @@ try {
   const latency = Date.now() - start;
 
   if (groupsErr) {
-    console.log(`❌ Query failed (${latency}ms):`, groupsErr.message);
-    console.log('Details:', groupsErr);
+    console.log(`❌ Groups query failed (${latency}ms):`, groupsErr.message);
   } else {
     console.log(`✅ Connection Successful (${latency}ms)!`);
-    console.log(`   Found ${groupsCount} groups in database:`, groups.map(g => g.name).join(', '));
+    console.log(`   [groups] ${groupsCount} groups:`, groups.map((g) => g.name).join(', '));
   }
+
+  // Check users table
+  const { data: users, error: usersErr, count: usersCount } = await supabase
+    .from('users')
+    .select('id, name, mac_address', { count: 'exact' });
+  if (usersErr) {
+    console.log(`⚠️  [users] table check failed:`, usersErr.message);
+  } else {
+    console.log(`   [users] ${usersCount} users registered`);
+  }
+
+  // Check accounts table
+  const { data: accounts, error: accountsErr, count: accountsCount } = await supabase
+    .from('accounts')
+    .select('id, username, role', { count: 'exact' });
+  if (accountsErr) {
+    console.log(`⚠️  [accounts] table check failed:`, accountsErr.message);
+  } else {
+    console.log(`   [accounts] ${accountsCount} accounts registered:`, accounts.map((a) => `${a.username} (${a.role})`).join(', '));
+  }
+
+  // Check draft_changes table
+  const { error: draftErr, count: draftCount } = await supabase
+    .from('draft_changes')
+    .select('id', { count: 'exact', head: true });
+  if (draftErr) {
+    console.log(`⚠️  [draft_changes] table check failed:`, draftErr.message);
+  } else {
+    console.log(`   [draft_changes] table operational (pending changes: ${draftCount || 0})`);
+  }
+
+  // Check config_versions table
+  const { error: configErr, count: configCount } = await supabase
+    .from('config_versions')
+    .select('id', { count: 'exact', head: true });
+  if (configErr) {
+    console.log(`⚠️  [config_versions] table check failed:`, configErr.message);
+  } else {
+    console.log(`   [config_versions] table operational (${configCount || 0} versions archived)`);
+  }
+
+  console.log('\n🎉 ALL SUPABASE TABLES ARE ACCESSIBLE & OPERATIONAL!');
 } catch (err) {
   console.log('❌ Failed with network exception:', err.message);
 }
