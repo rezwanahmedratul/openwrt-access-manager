@@ -933,6 +933,100 @@
   border-bottom: none;
 }
 
+/* Batch Import Dropzone & File Upload Elements */
+.import-dropzone {
+  border: 2px dashed var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  padding: 1.1rem 1rem;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+}
+
+.import-dropzone:hover {
+  border-color: var(--accent);
+  background: var(--bg-card);
+}
+
+.import-dropzone.dragging {
+  border-color: var(--accent);
+  background: rgba(37, 99, 235, 0.08);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+  transform: scale(1.005);
+}
+
+.import-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.import-file-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.75rem;
+  background: rgba(37, 99, 235, 0.1);
+  border: 1px solid rgba(37, 99, 235, 0.25);
+  border-radius: var(--radius-sm);
+  font-size: 0.76rem;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.import-file-badge button {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.85rem;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.import-file-badge button:hover {
+  color: #ef4444;
+}
+
+.import-stats-pills {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+
+.import-stat-pill {
+  font-size: 0.72rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 9999px;
+  font-weight: 600;
+}
+
+.import-stat-pill.valid {
+  background: rgba(16, 185, 129, 0.12);
+  color: #10b981;
+}
+
+.import-stat-pill.warning {
+  background: rgba(245, 158, 11, 0.12);
+  color: #f59e0b;
+}
+
+.import-stat-pill.error {
+  background: rgba(239, 68, 68, 0.12);
+  color: #ef4444;
+}
+
 /* ============================================================
    DASHBOARD MASTER MAC AUTHENTICATION SECURITY CARD
    ============================================================ */

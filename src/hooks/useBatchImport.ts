@@ -1,10 +1,8 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { UserViewModel, Group } from '@/lib/types';
-import { normalizeMac } from '@/lib/normalize-mac';
-import { normalizeName } from '@/lib/normalize-name';
-import { getMacVendor } from '@/lib/mac-vendors';
+import { parseImportText, ParsedImportItem } from '@/lib/csv-import';
 
 interface UseBatchImportProps {
   users: UserViewModel[];
@@ -25,108 +23,94 @@ export function useBatchImport({
   const [isImporting, setIsImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
 
-  // Batch Import Parser
-  const parsedImportItems = useMemo(() => {
-    if (!importText.trim()) return [];
-    const lines = importText.split('\n');
-    const seenMacsInBatch = new Set<string>();
-    const seenNamesInBatch = new Set<string>();
+  // File Upload & Drag-and-Drop state
+  const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
+  const [uploadedFileSize, setUploadedFileSize] = useState<number | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
 
-    return lines
-      .map((line, idx) => {
-        const trimmed = line.trim();
-        if (!trimmed || trimmed.startsWith('#')) return null;
-        let parts = trimmed.split(/[,;\t]/).map((p) => p.trim());
-        if (parts.length === 1) {
-          const ws = trimmed.split(/\s+/);
-          if (ws.length >= 2) {
-            parts = [ws[0], ws.slice(1).join(' ')];
-          }
-        }
-        const rawMac = parts[0] || '';
-        const rawName = parts[1] || '';
-        const rawGroupName = parts[2] || '';
-
-        const macRes = normalizeMac(rawMac);
-        const nameRes = normalizeName(rawName);
-
-        const normalizedMacUpper = macRes.valid ? macRes.normalized.toUpperCase() : '';
-        const normalizedNameLower = nameRes.valid ? nameRes.normalized.toLowerCase() : '';
-
-        // Check duplicate MAC against existing active users or earlier items in batch
-        const isDuplicateMacExisting =
-          macRes.valid &&
-          users.some(
-            (u) => u.status !== 'deleted' && u.mac_address.toUpperCase() === normalizedMacUpper
-          );
-        const isDuplicateMacBatch = macRes.valid && seenMacsInBatch.has(normalizedMacUpper);
-        const isDuplicateMac = isDuplicateMacExisting || isDuplicateMacBatch;
-
-        // Check duplicate Name against existing active users or earlier items in batch
-        const isDuplicateNameExisting =
-          nameRes.valid &&
-          users.some(
-            (u) =>
-              u.status !== 'deleted' &&
-              (u.name.toLowerCase() === normalizedNameLower ||
-                u.name.toLowerCase().replace(/_/g, ' ') === normalizedNameLower.replace(/_/g, ' '))
-          );
-        const isDuplicateNameBatch = nameRes.valid && seenNamesInBatch.has(normalizedNameLower);
-        const isDuplicateName = isDuplicateNameExisting || isDuplicateNameBatch;
-
-        if (macRes.valid) seenMacsInBatch.add(normalizedMacUpper);
-        if (nameRes.valid) seenNamesInBatch.add(normalizedNameLower);
-
-        const isDuplicate = isDuplicateMac || isDuplicateName;
-        const duplicateReason =
-          isDuplicateMac && isDuplicateName
-            ? 'Duplicate MAC & Name'
-            : isDuplicateMac
-            ? 'Duplicate MAC'
-            : isDuplicateName
-            ? 'Duplicate Name'
-            : null;
-
-        let matchedGroup = groups.find((g) => g.name.toLowerCase() === rawGroupName.toLowerCase());
-        if (!matchedGroup && importTargetGroup) {
-          matchedGroup = groups.find((g) => g.id === importTargetGroup);
-        }
-        if (!matchedGroup) {
-          matchedGroup = groups.find((g) => g.name.toLowerCase() === 'default') || groups[0];
-        }
-
-        const vendor = macRes.valid ? getMacVendor(macRes.normalized) : null;
-
-        return {
-          id: `import-${idx}`,
-          raw: line,
-          rawMac,
-          rawName,
-          mac: macRes.valid ? macRes.normalized : rawMac,
-          name: nameRes.valid ? nameRes.normalized : rawName,
-          vendor,
-          group: matchedGroup,
-          isValid: macRes.valid && nameRes.valid,
-          error: !macRes.valid ? macRes.error : !nameRes.valid ? nameRes.error : null,
-          isDuplicate,
-          duplicateReason,
-        };
-      })
-      .filter(Boolean) as {
-        id: string;
-        raw: string;
-        rawMac: string;
-        rawName: string;
-        mac: string;
-        name: string;
-        vendor: string | null;
-        group: Group | undefined;
-        isValid: boolean;
-        error?: string | null;
-        isDuplicate: boolean;
-        duplicateReason?: string | null;
-      }[];
+  // Batch Import Parser: supports exported CSV ("Name,MAC Address,Status,Groups") and legacy formats
+  const parsedImportItems = useMemo<ParsedImportItem[]>(() => {
+    return parseImportText(importText, users, groups, importTargetGroup);
   }, [importText, users, groups, importTargetGroup]);
+
+  // Handle uploaded file (from input picker or drag-drop)
+  const handleFileUpload = useCallback(
+    async (file: File) => {
+      try {
+        setImportError(null);
+        const text = await file.text();
+        setImportText(text);
+        setUploadedFileName(file.name);
+        setUploadedFileSize(file.size);
+        const kbSize = (file.size / 1024).toFixed(1);
+        onShowToast(`Loaded ${file.name} (${kbSize} KB)`);
+      } catch (err: any) {
+        setImportError(`Failed to read file: ${err.message || 'Unknown error'}`);
+      }
+    },
+    [onShowToast]
+  );
+
+  // Clear file and text
+  const handleClear = useCallback(() => {
+    setImportText('');
+    setUploadedFileName(null);
+    setUploadedFileSize(null);
+    setImportError(null);
+  }, []);
+
+  // Paste from System Clipboard
+  const handlePasteFromClipboard = useCallback(async () => {
+    try {
+      setImportError(null);
+      if (!navigator.clipboard || !navigator.clipboard.readText) {
+        setImportError('Clipboard reading is not supported in this browser. Use Ctrl+V / Cmd+V to paste directly into the box.');
+        return;
+      }
+      const text = await navigator.clipboard.readText();
+      if (!text || !text.trim()) {
+        onShowToast('Clipboard is empty or does not contain text', 'error');
+        return;
+      }
+      setImportText((prev) => (prev ? `${prev.trim()}\n${text.trim()}` : text.trim()));
+      onShowToast(`Pasted ${text.trim().split('\n').length} lines from clipboard`);
+    } catch (err: any) {
+      setImportError(`Clipboard access failed: ${err.message || 'Permission denied'}. You can paste directly using Ctrl+V.`);
+    }
+  }, [onShowToast]);
+
+  // Drag and drop handlers
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  }, []);
+
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsDragging(false);
+
+      if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+        const file = e.dataTransfer.files[0];
+        handleFileUpload(file);
+      } else {
+        const text = e.dataTransfer.getData('text');
+        if (text) {
+          setImportText(text);
+          onShowToast(`Dropped ${text.trim().split('\n').length} lines`);
+        }
+      }
+    },
+    [handleFileUpload, onShowToast]
+  );
 
   // Execute Batch Import
   const handleExecuteImport = async () => {
@@ -138,6 +122,34 @@ export function useBatchImport({
 
     setIsImporting(true);
     setImportError(null);
+
+    // Try high-performance batch draft API first
+    const operations = validItems.map((item) => ({
+      operation: 'ADD' as const,
+      name: item.name,
+      mac_address: item.mac,
+      group_ids: item.groupIds,
+    }));
+
+    try {
+      const batchRes = await fetch('/api/draft', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ operations }),
+      });
+
+      if (batchRes.ok) {
+        const batchData = await batchRes.json();
+        setIsImporting(false);
+        setShowImportModal(false);
+        handleClear();
+        onShowToast(`Successfully staged ${batchData.count || validItems.length} devices into pending drafts`);
+        onRefresh();
+        return;
+      }
+    } catch {
+      // If batch fails, fallback to sequential insertion below
+    }
 
     let successCount = 0;
     let failCount = 0;
@@ -151,7 +163,7 @@ export function useBatchImport({
             operation: 'ADD',
             name: item.name,
             mac_address: item.mac,
-            group_ids: item.group ? [item.group.id] : [],
+            group_ids: item.groupIds,
           }),
         });
         if (res.ok) {
@@ -166,7 +178,7 @@ export function useBatchImport({
 
     setIsImporting(false);
     setShowImportModal(false);
-    setImportText('');
+    handleClear();
     onShowToast(`Imported ${successCount} devices to pending drafts${failCount > 0 ? ` (${failCount} failed)` : ''}`);
     onRefresh();
   };
@@ -181,6 +193,15 @@ export function useBatchImport({
     isImporting,
     importError,
     setImportError,
+    uploadedFileName,
+    uploadedFileSize,
+    isDragging,
+    handleFileUpload,
+    handleClear,
+    handlePasteFromClipboard,
+    handleDragOver,
+    handleDragLeave,
+    handleDrop,
     parsedImportItems,
     handleExecuteImport,
   };

@@ -505,6 +505,15 @@ export default function DashboardPage() {
         parsedImportItems={batchImport.parsedImportItems}
         isImporting={batchImport.isImporting}
         onExecuteImport={batchImport.handleExecuteImport}
+        uploadedFileName={batchImport.uploadedFileName}
+        uploadedFileSize={batchImport.uploadedFileSize}
+        isDragging={batchImport.isDragging}
+        onFileUpload={batchImport.handleFileUpload}
+        onClear={batchImport.handleClear}
+        onPasteFromClipboard={batchImport.handlePasteFromClipboard}
+        onDragOver={batchImport.handleDragOver}
+        onDragLeave={batchImport.handleDragLeave}
+        onDrop={batchImport.handleDrop}
       />
 
       <BulkGroupModal
