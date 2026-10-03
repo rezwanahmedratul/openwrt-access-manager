@@ -10,16 +10,30 @@ console.log('==============================================');
 console.log('.env file path:', envPath);
 console.log('.env file size:', envContent.length, 'bytes');
 
-const lines = envContent.split('\n').filter(l => !l.startsWith('#') && l.trim());
-console.log('Active .env entries count:', lines.length);
+const envVars = {};
+lines.forEach((line) => {
+  const eqIdx = line.indexOf('=');
+  if (eqIdx > 0) {
+    const k = line.substring(0, eqIdx).trim();
+    let v = line.substring(eqIdx + 1).trim();
+    if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) {
+      v = v.slice(1, -1);
+    }
+    envVars[k] = v;
+  }
+});
 
-const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const url = process.env.NEXT_PUBLIC_SUPABASE_URL || envVars.NEXT_PUBLIC_SUPABASE_URL;
+const anonKey =
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+  envVars.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+  envVars.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || envVars.SUPABASE_SERVICE_ROLE_KEY;
 
-console.log('\n[Environment Variables]');
+console.log('\n[Environment Configuration]');
 console.log('- NEXT_PUBLIC_SUPABASE_URL:', url ? (url.startsWith('http') ? url : '[INVALID URL]') : '[NOT SET / EMPTY]');
-console.log('- NEXT_PUBLIC_SUPABASE_ANON_KEY:', anonKey ? `Set (${anonKey.length} chars)` : '[NOT SET / EMPTY]');
+console.log('- ANON / PUBLISHABLE KEY:', anonKey ? `Set (${anonKey.length} chars)` : '[NOT SET / EMPTY]');
 console.log('- SUPABASE_SERVICE_ROLE_KEY:', serviceKey ? `Set (${serviceKey.length} chars)` : '[NOT SET / EMPTY]');
 
 if (!url || !url.startsWith('http')) {
