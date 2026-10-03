@@ -22,6 +22,9 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Unauthorized: Invalid router credentials' }, { status: 401 });
   }
 
+  // Record router heartbeat telemetry
+  await cacheSet('telemetry:router:last_seen', new Date().toISOString(), 86400 * 30);
+
   // Check MAC auth status and handle auto-expiration first.
   // If MAC auth was temporarily disabled and has now expired, getMacAuthSettings()
   // will publish the new configuration (incrementing version and updating hash)

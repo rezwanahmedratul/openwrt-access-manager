@@ -6,22 +6,25 @@ import { getMacAuthSettings } from '@/lib/mac-auth';
 
 const FIREWALL_CACHE_KEY = 'cache:config:firewall';
 
+import { NextResponse } from 'next/server';
+import { getSessionFromRequest } from '@/lib/auth';
+
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 function authenticateRouter(request: Request): boolean {
+  // Allow authenticated session users (Admin & Subadmin) to preview/download configs
+  const session = getSessionFromRequest(request);
+  if (session) return true;
+
   const authHeader = request.headers.get('authorization') || '';
   const routerSecret = process.env.ROUTER_SECRET || 'openwrt-secret-token-change-in-production';
-  const { searchParams } = new URL(request.url);
-  const isDownload = searchParams.get('download') === 'true';
-
-  if (isDownload) return true;
   return authHeader === `Bearer ${routerSecret}`;
 }
 
 export async function GET(request: Request) {
   if (!authenticateRouter(request)) {
-    return new Response('Unauthorized: Invalid router credentials', { status: 401 });
+    return NextResponse.json({ error: 'Unauthorized: Invalid router credentials or session required' }, { status: 401 });
   }
 
   // Ensure expired MAC auth duration is auto re-enabled and published first

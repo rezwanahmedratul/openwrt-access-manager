@@ -24,7 +24,12 @@ async function invalidateGroupsAndUsersCache() {
 }
 
 // GET all groups
-export async function GET() {
+export async function GET(request: Request) {
+  const session = getSessionFromRequest(request);
+  if (!session) {
+    return NextResponse.json({ error: 'Unauthorized: Session required' }, { status: 401 });
+  }
+
   const cached = await cacheGet<Group[]>(GROUPS_CACHE_KEY);
   if (cached) {
     return NextResponse.json(
@@ -63,6 +68,10 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const session = getSessionFromRequest(request);
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized: Session required' }, { status: 401 });
+    }
+
     const body = await request.json();
     const { name, is_protected, is_no_internet } = body;
 
@@ -79,7 +88,7 @@ export async function POST(request: Request) {
     }
 
     // Only admin can create protected or no internet groups
-    if ((shouldProtect || shouldNoInternet) && session && session.role !== 'admin') {
+    if ((shouldProtect || shouldNoInternet) && session.role !== 'admin') {
       return NextResponse.json({ error: 'Only administrators can create protected or No Internet groups.' }, { status: 403 });
     }
 
@@ -149,6 +158,10 @@ export async function DELETE(request: Request) {
     }
 
     const session = getSessionFromRequest(request);
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized: Session required' }, { status: 401 });
+    }
+
     const supabase = getServiceSupabase();
     const isSupabaseConfigured = Boolean(
       process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_URL.startsWith('http')
@@ -157,7 +170,7 @@ export async function DELETE(request: Request) {
     // Verify protection status
     if (isSupabaseConfigured) {
       const { data: targetGroup } = await supabase.from('groups').select('*').eq('id', groupId).maybeSingle();
-      if (targetGroup?.is_protected && session?.role !== 'admin') {
+      if (targetGroup?.is_protected && session.role !== 'admin') {
         return NextResponse.json({ error: 'Only administrators can delete protected groups.' }, { status: 403 });
       }
 
@@ -173,7 +186,7 @@ export async function DELETE(request: Request) {
     } else {
       const state = getMockState();
       const targetGroup = state.mockGroups.find((g) => g.id === groupId);
-      if (targetGroup?.is_protected && session?.role !== 'admin') {
+      if (targetGroup?.is_protected && session.role !== 'admin') {
         return NextResponse.json({ error: 'Only administrators can delete protected groups.' }, { status: 403 });
       }
 
@@ -196,6 +209,10 @@ export async function DELETE(request: Request) {
 export async function PATCH(request: Request) {
   try {
     const session = getSessionFromRequest(request);
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized: Session required' }, { status: 401 });
+    }
+
     const body = await request.json();
     const { id, is_protected, is_no_internet, name, conflict_action } = body;
 
@@ -206,7 +223,6 @@ export async function PATCH(request: Request) {
     // Role check: Only admin can toggle protection or no_internet status
     if (
       (is_protected !== undefined || is_no_internet !== undefined) &&
-      session &&
       session.role !== 'admin'
     ) {
       return NextResponse.json(

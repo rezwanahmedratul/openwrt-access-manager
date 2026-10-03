@@ -5,6 +5,8 @@ import { normalizeMac } from '@/lib/normalize-mac';
 import { getMockState } from '@/lib/mock-store';
 import { cacheGet, cacheSet } from '@/lib/cache';
 import { getMacAuthSettings } from '@/lib/mac-auth';
+import { getSessionFromRequest } from '@/lib/auth';
+import { getMacVendor } from '@/lib/mac-vendors';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,6 +22,11 @@ interface RawUsersData {
 }
 
 export async function GET(request: Request) {
+  const session = getSessionFromRequest(request);
+  if (!session) {
+    return NextResponse.json({ error: 'Unauthorized: Session required' }, { status: 401 });
+  }
+
   const { searchParams } = new URL(request.url);
   const search = searchParams.get('search') || '';
   const groupFilter = searchParams.get('group') || '';
@@ -148,6 +155,8 @@ export async function GET(request: Request) {
     finalGroups = [defaultGroup, ...groups];
   }
 
+  const routerLastSeen = await cacheGet<string>('telemetry:router:last_seen');
+
   const viewMap = new Map<string, UserViewModel>();
 
   for (const u of appliedUsers) {
@@ -156,6 +165,7 @@ export async function GET(request: Request) {
       id: u.id,
       name: u.name,
       mac_address: u.mac_address,
+      vendor: getMacVendor(u.mac_address),
       groups: userGroups,
       status: 'applied',
     });
@@ -166,10 +176,12 @@ export async function GET(request: Request) {
       const tempId = `draft-add-${change.id}`;
       const changeGroups = finalGroups.filter((g) => change.user_data?.group_ids?.includes(g.id));
       const finalChangeGroups = changeGroups.length > 0 ? changeGroups : [defaultGroup];
+      const changeMac = change.user_data?.mac_address || '';
       viewMap.set(tempId, {
         id: tempId,
         name: change.user_data?.name || '',
-        mac_address: change.user_data?.mac_address || '',
+        mac_address: changeMac,
+        vendor: changeMac ? getMacVendor(changeMac) : null,
         groups: finalChangeGroups,
         status: 'added',
         draft_change_id: change.id,
@@ -179,10 +191,12 @@ export async function GET(request: Request) {
       if (existing) {
         const changeGroups = finalGroups.filter((g) => change.user_data?.group_ids?.includes(g.id));
         const finalChangeGroups = changeGroups.length > 0 ? changeGroups : [defaultGroup];
+        const updatedMac = change.user_data?.mac_address || existing.mac_address;
         viewMap.set(change.user_id, {
           ...existing,
           name: change.user_data?.name || existing.name,
-          mac_address: change.user_data?.mac_address || existing.mac_address,
+          mac_address: updatedMac,
+          vendor: getMacVendor(updatedMac),
           groups: finalChangeGroups,
           status: 'modified',
           draft_change_id: change.id,
@@ -233,6 +247,7 @@ export async function GET(request: Request) {
         current_version: currentVersion,
         last_applied: lastApplied,
         mac_auth: macAuth,
+        router_last_seen: routerLastSeen || null,
       },
       draft_changes: draftChanges,
     },

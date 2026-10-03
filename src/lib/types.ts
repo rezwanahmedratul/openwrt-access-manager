@@ -114,6 +114,7 @@ export interface DashboardStats {
   current_version: number | null;
   last_applied: string | null;
   mac_auth?: MacAuthSettings;
+  router_last_seen?: string | null;
 }
 
 // View model for the user table (combines applied state + draft state)
@@ -121,6 +122,7 @@ export interface UserViewModel {
   id: string; // real ID or temp ID for new
   name: string;
   mac_address: string;
+  vendor?: string | null;
   groups: Group[];
   status: 'applied' | 'added' | 'modified' | 'deleted';
   draft_change_id?: string;

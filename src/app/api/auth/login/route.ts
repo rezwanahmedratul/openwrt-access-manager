@@ -77,6 +77,7 @@ export async function POST(request: Request) {
     const token = createSessionToken(authenticatedUser);
     const response = NextResponse.json({
       success: true,
+      token,
       user: authenticatedUser,
       message: `Signed in as ${authenticatedUser.username} (${authenticatedUser.role})`,
     });

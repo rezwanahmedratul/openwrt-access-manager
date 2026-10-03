@@ -4,8 +4,14 @@ import { generateFirewallConfig, generateEthersConfig, computeConfigHash, UserCo
 import { getMockState } from '@/lib/mock-store';
 import { cacheDelPrefix } from '@/lib/cache';
 import { getMacAuthSettings } from '@/lib/mac-auth';
+import { getSessionFromRequest } from '@/lib/auth';
 
-export async function POST() {
+export async function POST(request: Request) {
+  const session = getSessionFromRequest(request);
+  if (!session) {
+    return NextResponse.json({ error: 'Unauthorized: Session required' }, { status: 401 });
+  }
+
   const supabase = getServiceSupabase();
   const isSupabaseConfigured = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_URL.startsWith('http'));
 
