@@ -4,6 +4,11 @@ const nextConfig = {
   // while allowing Vercel to optimize serverless builds natively.
   ...(process.env.VERCEL ? {} : { output: 'standalone' }),
   serverExternalPackages: ['ioredis'],
+  allowedDevOrigins: [
+    '10.0.0.75',
+    'localhost',
+    '127.0.0.1',
+  ],
   async rewrites() {
     return [
       { source: '/users', destination: '/?tab=users' },

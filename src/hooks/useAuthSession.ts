@@ -14,27 +14,8 @@ export function useAuthSession() {
   // Theme Management (Light / Dark Mode)
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
 
-  // Navigation state: 'dashboard' | 'users' | 'groups' | 'history' | 'account' | 'settings' with URL & localStorage persistence
-  const [activeTab, setActiveTab] = useState<ActiveTab>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const urlParams = new URLSearchParams(window.location.search);
-        const tabParam = urlParams.get('tab') as ActiveTab | null;
-        const hash = window.location.hash.replace('#', '') as ActiveTab;
-        const savedTab = localStorage.getItem('openwrt-active-tab') as ActiveTab | null;
-        const pathname = window.location.pathname.replace(/^\//, '') as ActiveTab;
-        const validTabs: ActiveTab[] = ['dashboard', 'users', 'groups', 'history', 'account', 'settings'];
-
-        if (tabParam && validTabs.includes(tabParam)) return tabParam;
-        if (pathname && validTabs.includes(pathname)) return pathname;
-        if (hash && validTabs.includes(hash)) return hash;
-        if (savedTab && validTabs.includes(savedTab)) return savedTab;
-      } catch {
-        // fallback
-      }
-    }
-    return 'dashboard';
-  });
+  // Navigation state: 'dashboard' | 'users' | 'groups' | 'history' | 'account' | 'settings' (hydrated cleanly via useEffect)
+  const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
 
   // Notification Toast
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
@@ -125,24 +106,53 @@ export function useAuthSession() {
     document.documentElement.setAttribute('data-theme', newTheme);
   };
 
-  // Auth Session Verification on Load
+  // Auth Session Verification on Load with failsafe timeout
   useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const res = await fetch('/api/auth/me');
-        const data = await res.json();
-        if (data.authenticated && data.user) {
-          setCurrentUser(data.user);
-        } else {
-          setCurrentUser(null);
-        }
-      } catch {
-        setCurrentUser(null);
-      } finally {
+    let active = true;
+    const controller = new AbortController();
+
+    // Failsafe timeout: under no circumstance should the UI remain on the gateway loading spinner for > 2000ms
+    const timeoutId = setTimeout(() => {
+      if (active) {
         setAuthChecking(false);
       }
+      controller.abort();
+    }, 2000);
+
+    const checkAuth = async () => {
+      try {
+        const res = await fetch('/api/auth/me', {
+          headers: { Accept: 'application/json' },
+          signal: controller.signal,
+          cache: 'no-store',
+        });
+        const data = await res.json();
+        if (active) {
+          if (data && data.authenticated && data.user) {
+            setCurrentUser(data.user);
+          } else {
+            setCurrentUser(null);
+          }
+        }
+      } catch {
+        if (active) {
+          setCurrentUser(null);
+        }
+      } finally {
+        if (active) {
+          clearTimeout(timeoutId);
+          setAuthChecking(false);
+        }
+      }
     };
+
     checkAuth();
+
+    return () => {
+      active = false;
+      clearTimeout(timeoutId);
+      controller.abort();
+    };
   }, []);
 
   // Login Form Submission
@@ -186,6 +196,7 @@ export function useAuthSession() {
     currentUser,
     setCurrentUser,
     authChecking,
+    setAuthChecking,
     loginUsername,
     setLoginUsername,
     loginPassword,

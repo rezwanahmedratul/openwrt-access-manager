@@ -37,6 +37,7 @@ export default function DashboardPage() {
   const {
     currentUser,
     authChecking,
+    setAuthChecking,
     loginUsername,
     setLoginUsername,
     loginPassword,
@@ -160,6 +161,22 @@ export default function DashboardPage() {
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
           <div className="loading-spinner" style={{ width: '24px', height: '24px' }}></div>
           <span style={{ color: 'var(--text-secondary)', fontSize: '0.86rem', fontWeight: 500 }}>Connecting to OpenWrt Gateway...</span>
+          <button
+            type="button"
+            onClick={() => setAuthChecking(false)}
+            style={{
+              marginTop: '0.5rem',
+              background: 'transparent',
+              border: '1px solid var(--border-color)',
+              color: 'var(--text-muted)',
+              fontSize: '0.76rem',
+              padding: '0.3rem 0.75rem',
+              borderRadius: '6px',
+              cursor: 'pointer',
+            }}
+          >
+            Skip to Sign In &rarr;
+          </button>
         </div>
       </div>
     );
