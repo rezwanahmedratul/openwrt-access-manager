@@ -138,49 +138,24 @@ export function useBatchImport({
         body: JSON.stringify({ operations }),
       });
 
+      const batchData = await batchRes.json();
+
       if (batchRes.ok) {
-        const batchData = await batchRes.json();
         setIsImporting(false);
         setShowImportModal(false);
         handleClear();
         onShowToast(`Successfully staged ${batchData.count || validItems.length} devices into pending drafts`);
         onRefresh();
         return;
+      } else {
+        setIsImporting(false);
+        setImportError(batchData.error || 'Failed to stage batch items.');
+        return;
       }
-    } catch {
-      // If batch fails, fallback to sequential insertion below
+    } catch (err: any) {
+      setIsImporting(false);
+      setImportError(`Network error while staging batch items: ${err.message || 'Server unreachable'}`);
     }
-
-    let successCount = 0;
-    let failCount = 0;
-
-    for (const item of validItems) {
-      try {
-        const res = await fetch('/api/draft', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            operation: 'ADD',
-            name: item.name,
-            mac_address: item.mac,
-            group_ids: item.groupIds,
-          }),
-        });
-        if (res.ok) {
-          successCount++;
-        } else {
-          failCount++;
-        }
-      } catch {
-        failCount++;
-      }
-    }
-
-    setIsImporting(false);
-    setShowImportModal(false);
-    handleClear();
-    onShowToast(`Imported ${successCount} devices to pending drafts${failCount > 0 ? ` (${failCount} failed)` : ''}`);
-    onRefresh();
   };
 
   return {

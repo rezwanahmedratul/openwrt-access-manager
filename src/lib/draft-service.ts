@@ -1,5 +1,7 @@
 import { getMockState } from './mock-store';
 import { DraftChange } from './types';
+import { normalizeMac } from './normalize-mac';
+import { normalizeName } from './normalize-name';
 
 export interface GroupCompatibilityCheck {
   valid: boolean;
@@ -389,5 +391,373 @@ export async function checkNameConflict(
   }
 
   return { conflict: false };
+}
+
+export interface DraftOperationItem {
+  operation: 'ADD' | 'MODIFY' | 'DELETE';
+  user_id?: string | null;
+  name?: string;
+  mac_address?: string;
+  group_ids?: string[];
+}
+
+export interface DraftValidationContext {
+  groupsById: Map<string, any>;
+  groupsByName: Map<string, any>;
+  defaultGroupId: string | null;
+  usersByMac: Map<string, { id: string; name: string; mac_address: string; is_protected?: boolean }>;
+  usersByName: Map<string, { id: string; name: string; mac_address: string; is_protected?: boolean }>;
+  usersById: Map<string, { id: string; name: string; mac_address: string; is_protected?: boolean }>;
+  draftsByMac: Map<string, { name: string; mac_address: string; userId?: string | null }>;
+  draftsByName: Map<string, { name: string; mac_address: string; userId?: string | null }>;
+  isSubadmin: boolean;
+}
+
+export async function buildDraftValidationContext(
+  supabase: any,
+  isSupabaseConfigured: boolean,
+  session: any
+): Promise<DraftValidationContext> {
+  const isSubadmin = session?.role === 'subadmin';
+
+  if (isSupabaseConfigured) {
+    const [groupsRes, usersRes, draftsRes, userGroupsRes] = await Promise.all([
+      supabase.from('groups').select('id, name, is_protected, is_no_internet'),
+      supabase.from('users').select('id, name, mac_address'),
+      supabase.from('draft_changes').select('id, user_id, user_data, operation').neq('operation', 'DELETE'),
+      isSubadmin
+        ? supabase.from('user_groups').select('user_id, groups(is_protected)')
+        : Promise.resolve({ data: [] }),
+    ]);
+
+    const groups = groupsRes.data || [];
+    const users = usersRes.data || [];
+    const drafts = draftsRes.data || [];
+    const userGroups = userGroupsRes.data || [];
+
+    const protectedUserIds = new Set<string>();
+    for (const ug of userGroups) {
+      if (ug.groups?.is_protected) {
+        protectedUserIds.add(ug.user_id);
+      }
+    }
+
+    const groupsById = new Map<string, any>();
+    const groupsByName = new Map<string, any>();
+    for (const g of groups) {
+      groupsById.set(g.id, g);
+      groupsByName.set(g.name.toLowerCase(), g);
+    }
+
+    let defaultGroup = groupsByName.get('default');
+    if (!defaultGroup) {
+      const { data: newDef } = await supabase
+        .from('groups')
+        .insert({ name: 'Default' })
+        .select('id, name, is_protected, is_no_internet')
+        .single();
+      if (newDef) {
+        defaultGroup = newDef;
+        groups.push(newDef);
+        groupsById.set(newDef.id, newDef);
+        groupsByName.set(newDef.name.toLowerCase(), newDef);
+      }
+    }
+    const defaultGroupId = defaultGroup?.id || null;
+
+    const usersByMac = new Map<string, any>();
+    const usersByName = new Map<string, any>();
+    const usersById = new Map<string, any>();
+
+    for (const u of users) {
+      const item = {
+        id: u.id,
+        name: u.name,
+        mac_address: u.mac_address,
+        is_protected: protectedUserIds.has(u.id),
+      };
+      if (u.mac_address) usersByMac.set(u.mac_address.toUpperCase(), item);
+      if (u.name) usersByName.set(u.name.toLowerCase(), item);
+      if (u.id) usersById.set(u.id, item);
+    }
+
+    const draftsByMac = new Map<string, any>();
+    const draftsByName = new Map<string, any>();
+
+    for (const d of drafts) {
+      if (d.user_data?.mac_address) {
+        draftsByMac.set(d.user_data.mac_address.toUpperCase(), {
+          name: d.user_data.name,
+          mac_address: d.user_data.mac_address,
+          userId: d.user_id || null,
+        });
+      }
+      if (d.user_data?.name) {
+        draftsByName.set(d.user_data.name.toLowerCase(), {
+          name: d.user_data.name,
+          mac_address: d.user_data.mac_address,
+          userId: d.user_id || null,
+        });
+      }
+    }
+
+    return {
+      groupsById,
+      groupsByName,
+      defaultGroupId,
+      usersByMac,
+      usersByName,
+      usersById,
+      draftsByMac,
+      draftsByName,
+      isSubadmin,
+    };
+  } else {
+    const state = getMockState();
+    const groupsById = new Map<string, any>();
+    const groupsByName = new Map<string, any>();
+    for (const g of state.mockGroups) {
+      groupsById.set(g.id, g);
+      groupsByName.set(g.name.toLowerCase(), g);
+    }
+
+    let defaultGroup = groupsByName.get('default');
+    if (!defaultGroup) {
+      defaultGroup = { id: 'g-default', name: 'Default', created_at: '', updated_at: '' };
+      state.setMockGroups([defaultGroup, ...state.mockGroups]);
+      groupsById.set(defaultGroup.id, defaultGroup);
+      groupsByName.set(defaultGroup.name.toLowerCase(), defaultGroup);
+    }
+    const defaultGroupId = defaultGroup.id;
+
+    const usersByMac = new Map<string, any>();
+    const usersByName = new Map<string, any>();
+    const usersById = new Map<string, any>();
+
+    for (const u of state.mockUsers) {
+      const isProt = Boolean(u.groups?.some((g: any) => g.is_protected));
+      const item = {
+        id: u.id,
+        name: u.name,
+        mac_address: u.mac_address,
+        is_protected: isProt,
+      };
+      if (u.mac_address) usersByMac.set(u.mac_address.toUpperCase(), item);
+      if (u.name) usersByName.set(u.name.toLowerCase(), item);
+      if (u.id) usersById.set(u.id, item);
+    }
+
+    const draftsByMac = new Map<string, any>();
+    const draftsByName = new Map<string, any>();
+
+    for (const d of state.mockDraftChanges) {
+      if (d.operation !== 'DELETE' && d.user_data?.mac_address) {
+        draftsByMac.set(d.user_data.mac_address.toUpperCase(), {
+          name: d.user_data.name,
+          mac_address: d.user_data.mac_address,
+          userId: d.user_id || null,
+        });
+      }
+      if (d.operation !== 'DELETE' && d.user_data?.name) {
+        draftsByName.set(d.user_data.name.toLowerCase(), {
+          name: d.user_data.name,
+          mac_address: d.user_data.mac_address,
+          userId: d.user_id || null,
+        });
+      }
+    }
+
+    return {
+      groupsById,
+      groupsByName,
+      defaultGroupId,
+      usersByMac,
+      usersByName,
+      usersById,
+      draftsByMac,
+      draftsByName,
+      isSubadmin,
+    };
+  }
+}
+
+export function fastValidateAndPrepareChange(
+  item: DraftOperationItem,
+  session: any,
+  ctx: DraftValidationContext
+): { error?: string; status?: number; changeData?: any } {
+  const { operation, user_id, name, mac_address, group_ids } = item;
+
+  if (!operation || !['ADD', 'MODIFY', 'DELETE'].includes(operation)) {
+    return { error: 'Invalid draft operation', status: 400 };
+  }
+
+  let normalizedMacStr = '';
+  let normalizedNameStr = '';
+
+  if (operation === 'ADD' || operation === 'MODIFY') {
+    const macResult = normalizeMac(mac_address || '');
+    if (!macResult.valid) {
+      return { error: macResult.error, status: 400 };
+    }
+    normalizedMacStr = macResult.normalized;
+
+    const nameResult = normalizeName(name || '');
+    if (!nameResult.valid) {
+      return { error: nameResult.error, status: 400 };
+    }
+    normalizedNameStr = nameResult.normalized;
+  }
+
+  let resolvedGroupIds = group_ids && Array.isArray(group_ids) && group_ids.length > 0 ? group_ids : [];
+  if (operation !== 'DELETE') {
+    if (resolvedGroupIds.length === 0 && ctx.defaultGroupId) {
+      resolvedGroupIds = [ctx.defaultGroupId];
+    }
+  }
+
+  if (operation !== 'DELETE' && resolvedGroupIds.length > 0) {
+    const targetGroups = resolvedGroupIds.map((id) => ctx.groupsById.get(id)).filter(Boolean);
+    const hasNoInternet = targetGroups.some((g) => g.is_no_internet);
+    const hasInternet = targetGroups.some((g) => !g.is_no_internet);
+    const hasProtected = targetGroups.some((g) => g.is_protected);
+
+    if (hasNoInternet && hasInternet) {
+      return {
+        error: 'A user cannot belong to a "No Internet" group and another group with internet access at the same time.',
+        status: 400,
+      };
+    }
+
+    if (hasNoInternet && hasProtected) {
+      return {
+        error: 'Users in protected groups cannot be assigned to a No Internet group. The user must be removed from protected groups first.',
+        status: 400,
+      };
+    }
+  }
+
+  // Subadmin check
+  if (ctx.isSubadmin) {
+    if (operation !== 'DELETE' && resolvedGroupIds.length > 0) {
+      const hasProtectedGroup = resolvedGroupIds.some((id) => ctx.groupsById.get(id)?.is_protected);
+      if (hasProtectedGroup) {
+        return {
+          error: 'Subadmins cannot assign users to protected groups. Administrator access required.',
+          status: 403,
+        };
+      }
+    }
+
+    if ((operation === 'MODIFY' || operation === 'DELETE') && user_id) {
+      const existingUser = ctx.usersById.get(user_id);
+      if (existingUser?.is_protected) {
+        return {
+          error: 'Subadmins cannot edit or delete users in protected groups. Administrator access required.',
+          status: 403,
+        };
+      }
+    }
+  }
+
+  // MAC conflict check
+  if (operation !== 'DELETE') {
+    const existingUser = ctx.usersByMac.get(normalizedMacStr);
+    if (operation === 'ADD') {
+      if (existingUser) {
+        return {
+          error: `MAC address ${normalizedMacStr} already assigned to user ${existingUser.name}`,
+          status: 400,
+        };
+      }
+      const draftDup = ctx.draftsByMac.get(normalizedMacStr);
+      if (draftDup) {
+        return {
+          error: `MAC address ${normalizedMacStr} is already queued in pending draft changes for "${draftDup.name}".`,
+          status: 400,
+        };
+      }
+    } else if (operation === 'MODIFY') {
+      if (existingUser && existingUser.id !== user_id) {
+        return {
+          error: `MAC address ${normalizedMacStr} already assigned to user ${existingUser.name}`,
+          status: 400,
+        };
+      }
+      const draftDup = ctx.draftsByMac.get(normalizedMacStr);
+      if (draftDup && draftDup.userId !== user_id) {
+        return {
+          error: `MAC address ${normalizedMacStr} is already queued in pending draft changes for "${draftDup.name}".`,
+          status: 400,
+        };
+      }
+    }
+  }
+
+  // Name conflict check
+  if (operation !== 'DELETE') {
+    const targetName = normalizedNameStr.trim().toLowerCase();
+    const existingUser = ctx.usersByName.get(targetName);
+    if (operation === 'ADD') {
+      if (existingUser) {
+        return {
+          error: `User name "${existingUser.name}" already exists (assigned to MAC ${existingUser.mac_address}).`,
+          status: 400,
+        };
+      }
+      const draftDup = ctx.draftsByName.get(targetName);
+      if (draftDup) {
+        return {
+          error: `User name "${normalizedNameStr}" is already queued in pending draft changes for MAC ${draftDup.mac_address}.`,
+          status: 400,
+        };
+      }
+    } else if (operation === 'MODIFY') {
+      if (existingUser && existingUser.id !== user_id) {
+        return {
+          error: `User name "${existingUser.name}" already exists (assigned to MAC ${existingUser.mac_address}).`,
+          status: 400,
+        };
+      }
+      const draftDup = ctx.draftsByName.get(targetName);
+      if (draftDup && draftDup.userId !== user_id) {
+        return {
+          error: `User name "${normalizedNameStr}" is already queued in pending draft changes for MAC ${draftDup.mac_address}.`,
+          status: 400,
+        };
+      }
+    }
+  }
+
+  // Register into context for intra-batch duplicate detection!
+  if (operation !== 'DELETE') {
+    const targetName = normalizedNameStr.trim().toLowerCase();
+    ctx.draftsByMac.set(normalizedMacStr, {
+      name: normalizedNameStr,
+      mac_address: normalizedMacStr,
+      userId: user_id || null,
+    });
+    ctx.draftsByName.set(targetName, {
+      name: normalizedNameStr,
+      mac_address: normalizedMacStr,
+      userId: user_id || null,
+    });
+  }
+
+  const changeData = {
+    draft_id: 'current',
+    operation,
+    user_id: user_id || null,
+    user_data:
+      operation !== 'DELETE'
+        ? {
+            name: normalizedNameStr,
+            mac_address: normalizedMacStr,
+            group_ids: resolvedGroupIds,
+          }
+        : null,
+  };
+
+  return { changeData };
 }
 

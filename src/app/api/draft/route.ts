@@ -12,6 +12,9 @@ import {
   checkSubadminProtection,
   checkMacConflict,
   checkNameConflict,
+  buildDraftValidationContext,
+  fastValidateAndPrepareChange,
+  DraftOperationItem,
 } from '@/lib/draft-service';
 
 export const dynamic = 'force-dynamic';
@@ -54,13 +57,6 @@ export async function GET(request: Request) {
   });
 }
 
-interface DraftOperationItem {
-  operation: 'ADD' | 'MODIFY' | 'DELETE';
-  user_id?: string | null;
-  name?: string;
-  mac_address?: string;
-  group_ids?: string[];
-}
 
 async function validateAndPrepareChange(
   item: DraftOperationItem,
@@ -180,11 +176,12 @@ export async function POST(request: Request) {
     );
 
     const preparedChanges: any[] = [];
+    const ctx = await buildDraftValidationContext(supabase, isSupabaseConfigured, session);
 
-    // Validate all items
+    // Validate all items in-memory using pre-fetched context
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
-      const result = await validateAndPrepareChange(item, session, supabase, isSupabaseConfigured);
+      const result = fastValidateAndPrepareChange(item, session, ctx);
       if (result.error) {
         return NextResponse.json(
           { error: `Item ${i + 1}: ${result.error}`, item_index: i },
