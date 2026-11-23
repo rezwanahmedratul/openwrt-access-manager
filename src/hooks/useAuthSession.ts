@@ -121,8 +121,13 @@ export function useAuthSession() {
 
     const checkAuth = async () => {
       try {
+        const token = typeof window !== 'undefined' ? localStorage.getItem('openwrt-session-token') : null;
+        const headers: Record<string, string> = { Accept: 'application/json' };
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
         const res = await fetch('/api/auth/me', {
-          headers: { Accept: 'application/json' },
+          headers,
           signal: controller.signal,
           cache: 'no-store',
         });
@@ -171,6 +176,9 @@ export function useAuthSession() {
         setLoginError(data.error || 'Failed to sign in');
         return;
       }
+      if (typeof window !== 'undefined' && data.token) {
+        localStorage.setItem('openwrt-session-token', data.token);
+      }
       setCurrentUser(data.user);
       showToast(`Welcome back, ${data.user.username} (${data.user.role})`);
     } catch (err: any) {
@@ -183,11 +191,20 @@ export function useAuthSession() {
   // Logout
   const handleLogout = async () => {
     try {
-      await fetch('/api/auth/logout', { method: 'POST' });
+      const token = typeof window !== 'undefined' ? localStorage.getItem('openwrt-session-token') : null;
+      const headers: Record<string, string> = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      await fetch('/api/auth/logout', { method: 'POST', headers });
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('openwrt-session-token');
+      }
       setCurrentUser(null);
       handleTabChange('dashboard');
       showToast('Signed out of gateway session');
     } catch {
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('openwrt-session-token');
+      }
       setCurrentUser(null);
     }
   };

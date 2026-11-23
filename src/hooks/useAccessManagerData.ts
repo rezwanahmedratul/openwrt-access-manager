@@ -153,7 +153,14 @@ export function useAccessManagerData({ currentUser, onShowToast }: UseAccessMana
   const fetchData = useCallback(async (searchQuery = debouncedSearch, groupFilter = selectedGroup) => {
     try {
       setLoading(true);
-      const res = await fetch(`/api/users?search=${encodeURIComponent(searchQuery)}&group=${encodeURIComponent(groupFilter)}`);
+      const token = typeof window !== 'undefined' ? localStorage.getItem('openwrt-session-token') : null;
+      const headers: Record<string, string> = { Accept: 'application/json' };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      const res = await fetch(`/api/users?search=${encodeURIComponent(searchQuery)}&group=${encodeURIComponent(groupFilter)}`, {
+        headers,
+      });
       const data = await res.json();
       if (data.users) setUsers(data.users);
       if (data.groups) setGroups(data.groups);

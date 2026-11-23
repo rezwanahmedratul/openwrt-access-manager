@@ -122,6 +122,22 @@ config rule
 	option target 'ACCEPT'
 	option enabled '1'
 
+config rule
+	option name 'Allow-SSH'
+	option src 'wan'
+	option proto 'tcp'
+	option dest_port '22'
+	option target 'ACCEPT'
+	option enabled '1'
+
+config rule
+	option name 'Allow-WebUI'
+	option src 'wan'
+	option proto 'tcp'
+	option dest_port '80'
+	option target 'ACCEPT'
+	option enabled '1'
+
 config zone
 	option name 'wan'
 	option input 'REJECT'

@@ -57,8 +57,10 @@ export async function GET(request: Request) {
   if (!content) {
     if (isSupabaseConfigured) {
       try {
-        const { data: users } = await supabase.from('users').select('name, mac_address').order('name');
-        content = generateEthersConfig(users || []);
+        const { data: users, error: usersErr } = await supabase.from('users').select('name, mac_address').order('name');
+        if (!usersErr && users && users.length > 0) {
+          content = generateEthersConfig(users);
+        }
       } catch (e) {
         console.error('Error generating fallback ethers config from Supabase:', e);
       }

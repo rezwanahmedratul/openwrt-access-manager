@@ -39,7 +39,7 @@ function getSessionSecret(): string | null {
 export function getSessionCookieOptions(maxAgeSeconds = 7 * 24 * 60 * 60) {
   return {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
+    secure: process.env.COOKIE_SECURE === 'true',
     sameSite: 'lax' as const,
     path: '/',
     maxAge: maxAgeSeconds,

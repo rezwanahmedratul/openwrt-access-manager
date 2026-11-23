@@ -69,16 +69,18 @@ export async function GET(request: Request) {
   if (!content) {
     if (isSupabaseConfigured) {
       try {
-        const { data: users } = await supabase
+        const { data: users, error: usersErr } = await supabase
           .from('users')
           .select('name, mac_address, user_groups ( groups ( is_no_internet ) )')
           .order('name');
-        const mapped = (users || []).map((u: any) => ({
-          name: u.name,
-          mac_address: u.mac_address,
-          is_no_internet: Boolean(u.user_groups?.some((ug: any) => ug.groups?.is_no_internet)),
-        }));
-        content = generateFirewallConfig(mapped, macAuth.enabled);
+        if (!usersErr && users && users.length > 0) {
+          const mapped = users.map((u: any) => ({
+            name: u.name,
+            mac_address: u.mac_address,
+            is_no_internet: Boolean(u.user_groups?.some((ug: any) => ug.groups?.is_no_internet)),
+          }));
+          content = generateFirewallConfig(mapped, macAuth.enabled);
+        }
       } catch (e) {
         console.error('Error generating fallback firewall config from Supabase:', e);
       }

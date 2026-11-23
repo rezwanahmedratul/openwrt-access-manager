@@ -18,10 +18,10 @@
 
 # ── Configuration ─────────────────────────────────────────────────────────────
 # Base URL of the Access Manager web panel (no trailing slash)
-SERVER_URL="${ACCESS_MANAGER_URL:-https://server.example}"
+SERVER_URL="${ACCESS_MANAGER_URL:-http://10.0.0.75:3000}"
 
 # Bearer token matching ROUTER_SECRET on the server
-AUTH_TOKEN="${ROUTER_SECRET:-openwrt-secret-token-change-in-production}"
+AUTH_TOKEN="${ROUTER_SECRET:-OpenWrt_Access_Manager_Secret_Token_2026}"
 
 # Paths to the live config files on the router (allows override for testing)
 FIREWALL_FILE="${FIREWALL_CONFIG:-/etc/config/firewall}"
