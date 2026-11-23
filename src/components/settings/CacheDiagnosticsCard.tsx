@@ -55,7 +55,6 @@ export const CacheDiagnosticsCard: React.FC<CacheDiagnosticsCardProps> = ({
           </div>
           <div className="settings-row-control">
             <div className="gateway-pill" style={{ margin: 0 }}>
-              <span className="gateway-pill-dot" style={{ backgroundColor: cacheInfo?.connected ? '#22c55e' : '#eab308' }}></span>
               <span style={{ fontWeight: 600 }}>
                 {cacheInfo?.engine === 'redis' ? 'Redis 7.0 (Active & Connected)' : 'In-Memory Cache (Active)'}
               </span>

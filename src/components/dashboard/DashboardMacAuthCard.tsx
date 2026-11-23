@@ -25,14 +25,13 @@ export const DashboardMacAuthCard: React.FC<DashboardMacAuthCardProps> = ({
   return (
     <div className={`dashboard-mac-auth-banner ${isMacAuthDisabled ? 'is-disabled' : 'is-enabled'}`}>
       <div className="mac-auth-banner-main">
-        {/* State Icon with Pulse Indicator */}
+        {/* State Icon */}
         <div className={`mac-auth-icon-wrapper ${isMacAuthDisabled ? 'icon-disabled' : 'icon-enabled'}`}>
           {isMacAuthDisabled ? (
             <IconUnlock size={20} />
           ) : (
             <IconLock size={19} />
           )}
-          <span className={`mac-auth-status-dot ${isMacAuthDisabled ? 'dot-disabled' : 'dot-enabled'}`} />
         </div>
 
         {/* Text & Metadata */}
@@ -41,15 +40,9 @@ export const DashboardMacAuthCard: React.FC<DashboardMacAuthCardProps> = ({
             <h3 className="mac-auth-title">
               {isMacAuthDisabled ? 'MAC Authentication Bypassed' : 'MAC Authentication Active'}
             </h3>
-            {isMacAuthDisabled ? (
-              <span className="mac-auth-status-badge badge-bypassed">
-                ● Open to All Devices
-              </span>
-            ) : (
-              <span className="mac-auth-status-badge badge-enforced">
-                ● Strict Enforcement
-              </span>
-            )}
+            <span className="mac-auth-status-badge">
+              {isMacAuthDisabled ? 'Bypassed' : 'Active'}
+            </span>
           </div>
 
           <p className="mac-auth-subtext">

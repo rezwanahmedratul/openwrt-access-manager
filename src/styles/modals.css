@@ -100,9 +100,9 @@
 .form-alert-msg {
   padding: 0.65rem 0.85rem;
   background: var(--bg-card-subtle);
-  border: 1px solid #ef4444;
+  border: 1px solid var(--border-subtle);
   border-radius: var(--radius-sm);
-  color: #ef4444;
+  color: var(--text-primary);
   font-size: 0.82rem;
   margin-bottom: 1.1rem;
   animation: fadeInDown 0.25s ease-out;
@@ -200,15 +200,15 @@
 }
 
 .mac-auth-badge-on {
-  background: rgba(16, 185, 129, 0.12);
-  color: #10b981;
-  border: 1px solid rgba(16, 185, 129, 0.25);
+  background: var(--bg-pill);
+  color: var(--text-primary);
+  border: 1px solid var(--border-subtle);
 }
 
 .mac-auth-badge-off {
-  background: rgba(239, 68, 68, 0.12);
-  color: #ef4444;
-  border: 1px solid rgba(239, 68, 68, 0.25);
+  background: var(--bg-pill);
+  color: var(--text-muted);
+  border: 1px solid var(--border-subtle);
 }
 
 .mac-auth-timer-chip {

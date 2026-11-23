@@ -21,7 +21,6 @@ export const UsersStatsRibbon: React.FC<UsersStatsRibbonProps> = ({ users }) => 
             </svg>
             <span className="stat-title-label">TOTAL DEVICES</span>
           </div>
-          <span className="stat-index-badge">01</span>
         </div>
         <div className="stat-big-value">{users.length}</div>
         <div className="stat-footer-text">Registered MAC addresses</div>
@@ -36,12 +35,11 @@ export const UsersStatsRibbon: React.FC<UsersStatsRibbonProps> = ({ users }) => 
             </svg>
             <span className="stat-title-label">ACTIVE / APPLIED</span>
           </div>
-          <span className="stat-index-badge">02</span>
         </div>
         <div className="stat-big-value">
           {users.filter((u) => u.status === 'applied').length}
         </div>
-        <div className="stat-footer-text">Synced with OpenWrt firewall</div>
+        <div className="stat-footer-text">Applied rules</div>
       </div>
 
       <div className="stat-card-box">
@@ -53,12 +51,11 @@ export const UsersStatsRibbon: React.FC<UsersStatsRibbonProps> = ({ users }) => 
             </svg>
             <span className="stat-title-label">PENDING SYNC</span>
           </div>
-          <span className="stat-index-badge">03</span>
         </div>
         <div className="stat-big-value">
           {users.filter((u) => u.status !== 'applied').length}
         </div>
-        <div className="stat-footer-text">Draft rules awaiting commit</div>
+        <div className="stat-footer-text">Pending rules</div>
       </div>
 
       <div className="stat-card-box">
@@ -70,7 +67,6 @@ export const UsersStatsRibbon: React.FC<UsersStatsRibbonProps> = ({ users }) => 
             </svg>
             <span className="stat-title-label">NO INTERNET</span>
           </div>
-          <span className="stat-index-badge">04</span>
         </div>
         <div className="stat-big-value">
           {users.filter((u) => u.groups?.some((g) => g.is_no_internet)).length}

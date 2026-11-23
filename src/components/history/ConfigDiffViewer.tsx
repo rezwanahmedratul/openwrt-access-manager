@@ -147,9 +147,9 @@ export const ConfigDiffViewer: React.FC<ConfigDiffViewerProps> = ({ oldText, new
             fontWeight: 600,
             padding: '0.2rem 0.55rem',
             borderRadius: '9999px',
-            background: addedCount > 0 ? 'rgba(16, 185, 129, 0.15)' : 'var(--bg-card-subtle)',
-            color: addedCount > 0 ? '#10b981' : 'var(--text-muted)',
-            border: `1px solid ${addedCount > 0 ? 'rgba(16, 185, 129, 0.3)' : 'var(--border-subtle)'}`,
+            background: 'var(--bg-card-subtle)',
+            color: 'var(--text-primary)',
+            border: '1px solid var(--border-subtle)',
           }}
         >
           <span>+{addedCount} Added</span>
@@ -164,9 +164,9 @@ export const ConfigDiffViewer: React.FC<ConfigDiffViewerProps> = ({ oldText, new
             fontWeight: 600,
             padding: '0.2rem 0.55rem',
             borderRadius: '9999px',
-            background: removedCount > 0 ? 'rgba(239, 68, 68, 0.15)' : 'var(--bg-card-subtle)',
-            color: removedCount > 0 ? '#ef4444' : 'var(--text-muted)',
-            border: `1px solid ${removedCount > 0 ? 'rgba(239, 68, 68, 0.3)' : 'var(--border-subtle)'}`,
+            background: 'var(--bg-card-subtle)',
+            color: 'var(--text-secondary)',
+            border: '1px solid var(--border-subtle)',
           }}
         >
           <span>-{removedCount} Removed</span>
@@ -181,9 +181,9 @@ export const ConfigDiffViewer: React.FC<ConfigDiffViewerProps> = ({ oldText, new
             fontWeight: 600,
             padding: '0.2rem 0.55rem',
             borderRadius: '9999px',
-            background: modifiedCount > 0 ? 'rgba(245, 158, 11, 0.15)' : 'var(--bg-card-subtle)',
-            color: modifiedCount > 0 ? '#f59e0b' : 'var(--text-muted)',
-            border: `1px solid ${modifiedCount > 0 ? 'rgba(245, 158, 11, 0.3)' : 'var(--border-subtle)'}`,
+            background: 'var(--bg-card-subtle)',
+            color: 'var(--text-secondary)',
+            border: '1px solid var(--border-subtle)',
           }}
         >
           <span>~{modifiedCount} Modified</span>
@@ -199,9 +199,9 @@ export const ConfigDiffViewer: React.FC<ConfigDiffViewerProps> = ({ oldText, new
               fontWeight: 600,
               padding: '0.2rem 0.55rem',
               borderRadius: '9999px',
-              background: 'rgba(59, 130, 246, 0.15)',
-              color: '#3b82f6',
-              border: '1px solid rgba(59, 130, 246, 0.3)',
+              background: 'var(--bg-card-subtle)',
+              color: 'var(--text-secondary)',
+              border: '1px solid var(--border-subtle)',
             }}
           >
             <span>{groupCount} Group Changes</span>
@@ -221,12 +221,12 @@ export const ConfigDiffViewer: React.FC<ConfigDiffViewerProps> = ({ oldText, new
                 justifyContent: 'space-between',
                 padding: '0.4rem 0.65rem',
                 borderRadius: '4px',
-                background: 'rgba(16, 185, 129, 0.08)',
-                border: '1px solid rgba(16, 185, 129, 0.25)',
+                background: 'var(--bg-card-subtle)',
+                border: '1px solid var(--border-subtle)',
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                <span style={{ color: '#10b981', fontWeight: 700 }}>+ ADDED:</span>
+                <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>+ ADDED:</span>
                 <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{d.name || 'Unnamed Device'}</span>
               </div>
               <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>
@@ -244,12 +244,12 @@ export const ConfigDiffViewer: React.FC<ConfigDiffViewerProps> = ({ oldText, new
                 justifyContent: 'space-between',
                 padding: '0.4rem 0.65rem',
                 borderRadius: '4px',
-                background: 'rgba(239, 68, 68, 0.08)',
-                border: '1px solid rgba(239, 68, 68, 0.25)',
+                background: 'var(--bg-card-subtle)',
+                border: '1px solid var(--border-subtle)',
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                <span style={{ color: '#ef4444', fontWeight: 700 }}>- REMOVED:</span>
+                <span style={{ fontWeight: 700, color: 'var(--text-secondary)' }}>- REMOVED:</span>
                 <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{d.name || 'Unnamed Device'}</span>
               </div>
               <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>
@@ -267,12 +267,12 @@ export const ConfigDiffViewer: React.FC<ConfigDiffViewerProps> = ({ oldText, new
                 justifyContent: 'space-between',
                 padding: '0.4rem 0.65rem',
                 borderRadius: '4px',
-                background: 'rgba(245, 158, 11, 0.08)',
-                border: '1px solid rgba(245, 158, 11, 0.25)',
+                background: 'var(--bg-card-subtle)',
+                border: '1px solid var(--border-subtle)',
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                <span style={{ color: '#f59e0b', fontWeight: 700 }}>~ MODIFIED:</span>
+                <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>~ MODIFIED:</span>
                 <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{d.name}</span>
                 <span style={{ color: 'var(--text-secondary)', fontSize: '0.72rem' }}>
                   ({Array.isArray(d.changes) ? d.changes.join(', ') : d.changes})
@@ -293,11 +293,11 @@ export const ConfigDiffViewer: React.FC<ConfigDiffViewerProps> = ({ oldText, new
                 gap: '0.4rem',
                 padding: '0.4rem 0.65rem',
                 borderRadius: '4px',
-                background: 'rgba(59, 130, 246, 0.08)',
-                border: '1px solid rgba(59, 130, 246, 0.25)',
+                background: 'var(--bg-card-subtle)',
+                border: '1px solid var(--border-subtle)',
               }}
             >
-              <span style={{ color: '#3b82f6', fontWeight: 700 }}>GROUP UPDATE:</span>
+              <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>GROUP UPDATE:</span>
               <span>{g.group || g.name}: {g.change}</span>
             </div>
           ))}

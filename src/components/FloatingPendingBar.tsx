@@ -21,7 +21,6 @@ export const FloatingPendingBar: React.FC<FloatingPendingBarProps> = ({
     <div className="floating-pending-bar-wrapper">
       <div className="floating-pending-bar">
         <div className="pending-left-info">
-          <span className="pending-dot-pulse"></span>
           <span className="pending-count-badge">{pendingChanges}</span>
           <span className="pending-text-desktop">
             {pendingChanges} pending {pendingChanges === 1 ? 'change' : 'changes'} in draft

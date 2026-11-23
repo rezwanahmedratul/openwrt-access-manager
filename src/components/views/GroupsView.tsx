@@ -41,14 +41,6 @@ export const GroupsView: React.FC<GroupsViewProps> = ({
 }) => {
   return (
     <div className="page-content-animated" key="groups">
-      {/* Small Top Pill */}
-      <div>
-        <div className="gateway-pill">
-          <span className="gateway-pill-dot"></span>
-          <span>Organizational Taxonomies</span>
-        </div>
-      </div>
-
       {/* Groups Page Headline */}
       <div className="header-row">
         <div className="title-col">

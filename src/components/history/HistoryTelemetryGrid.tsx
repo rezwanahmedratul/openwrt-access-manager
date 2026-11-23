@@ -66,16 +66,16 @@ export const HistoryTelemetryGrid: React.FC<HistoryTelemetryGridProps> = ({
 
       <div className="history-telemetry-card">
         <div className="history-telemetry-header">
-          <span>Integrity Seal</span>
+          <span>Config Hash</span>
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ flexShrink: 0, opacity: 0.7 }}>
             <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
           </svg>
         </div>
         <div className="history-telemetry-value" style={{ fontFamily: 'var(--font-mono)', fontSize: '1.05rem', letterSpacing: '-0.02em' }}>
-          {liveHistoryItem?.hash ? liveHistoryItem.hash.substring(0, 10) + '…' : 'Verified'}
+          {liveHistoryItem?.hash ? liveHistoryItem.hash.substring(0, 10) + '…' : 'None'}
         </div>
-        <div className="history-telemetry-subtext" style={{ color: 'var(--status-applied-text)' }}>
-          <span>● SHA-256 Verified</span>
+        <div className="history-telemetry-subtext">
+          <span>SHA-256 fingerprint</span>
         </div>
       </div>
     </div>

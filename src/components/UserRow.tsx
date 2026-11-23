@@ -72,7 +72,6 @@ export const UserRow: React.FC<UserRowProps> = ({
             </span>
           ) : (
             <span className={`status-badge-capsule status-badge-${user.status}`}>
-              <span className="status-green-dot"></span>
               <span>{user.status}</span>
             </span>
           )}
@@ -88,14 +87,13 @@ export const UserRow: React.FC<UserRowProps> = ({
                   fontSize: '0.64rem',
                   fontWeight: 600,
                   padding: '0.12rem 0.4rem',
-                  borderRadius: '9999px',
-                  backgroundColor: 'rgba(239, 68, 68, 0.12)',
-                  color: '#ef4444',
-                  border: '1px solid rgba(239, 68, 68, 0.25)',
+                  borderRadius: 'var(--radius-pill)',
+                  backgroundColor: 'var(--bg-pill)',
+                  color: 'var(--text-muted)',
+                  border: '1px solid var(--border-subtle)',
                 }}
                 title={`Temporary access expired on ${new Date(user.temporary_access_until).toLocaleString()}`}
               >
-                <span style={{ width: '4px', height: '4px', borderRadius: '50%', backgroundColor: '#ef4444' }} />
                 Expired
               </span>
             ) : (
@@ -107,14 +105,13 @@ export const UserRow: React.FC<UserRowProps> = ({
                   fontSize: '0.64rem',
                   fontWeight: 600,
                   padding: '0.12rem 0.4rem',
-                  borderRadius: '9999px',
-                  backgroundColor: 'rgba(245, 158, 11, 0.12)',
-                  color: '#f59e0b',
-                  border: '1px solid rgba(245, 158, 11, 0.25)',
+                  borderRadius: 'var(--radius-pill)',
+                  backgroundColor: 'var(--bg-pill)',
+                  color: 'var(--text-primary)',
+                  border: '1px solid var(--border-subtle)',
                 }}
                 title={`Temporary access active until ${new Date(user.temporary_access_until).toLocaleString()}`}
               >
-                <span style={{ width: '4px', height: '4px', borderRadius: '50%', backgroundColor: '#f59e0b' }} />
                 Temp
               </span>
             )
@@ -130,14 +127,13 @@ export const UserRow: React.FC<UserRowProps> = ({
                 fontSize: '0.64rem',
                 fontWeight: 600,
                 padding: '0.12rem 0.4rem',
-                borderRadius: '9999px',
-                backgroundColor: 'rgba(99, 102, 241, 0.12)',
-                color: '#6366f1',
-                border: '1px solid rgba(99, 102, 241, 0.25)',
+                borderRadius: 'var(--radius-pill)',
+                backgroundColor: 'var(--bg-pill)',
+                color: 'var(--text-secondary)',
+                border: '1px solid var(--border-subtle)',
               }}
               title={`Scheduled: ${user.schedule.days.join(', ')} ${user.schedule.start_time}-${user.schedule.stop_time} (${user.schedule.timezone || 'Asia/Dhaka'})`}
             >
-              <span style={{ width: '4px', height: '4px', borderRadius: '50%', backgroundColor: '#6366f1' }} />
               Scheduled ({user.schedule.start_time}-{user.schedule.stop_time})
             </span>
           )}

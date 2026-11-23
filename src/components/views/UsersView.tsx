@@ -40,14 +40,6 @@ export const UsersView: React.FC<UsersViewProps> = (props) => {
 
   return (
     <div className="page-content-animated" key="users">
-      {/* Small Top Pill */}
-      <div>
-        <div className="gateway-pill">
-          <span className="gateway-pill-dot"></span>
-          <span>Network Directory • Unbounded Client Inventory</span>
-        </div>
-      </div>
-
       {/* All Users Page Headline */}
       <div className="header-row">
         <div className="title-col">

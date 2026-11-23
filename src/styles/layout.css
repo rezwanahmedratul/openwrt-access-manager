@@ -127,34 +127,26 @@
 }
 
 .sidebar-bottom {
-  padding-top: 1.5rem;
+  padding-top: 1.25rem;
   border-top: 1px solid var(--border-subtle);
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  gap: 0.35rem;
 }
 
 .system-status-row {
   display: flex;
   align-items: center;
-  gap: 0.55rem;
-  font-size: 0.82rem;
-  font-weight: 600;
+  font-size: 0.8rem;
+  font-weight: 500;
   color: var(--text-primary);
-}
-
-.status-indicator-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background-color: var(--status-applied-dot);
-  animation: pulseRing 2s ease infinite;
+  line-height: 1;
 }
 
 .system-version-sub {
-  font-size: 0.73rem;
-  color: var(--text-secondary);
-  padding-left: 1rem;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  line-height: 1.2;
 }
 
 /* ============================================================
@@ -417,13 +409,6 @@
   color: var(--text-secondary);
   margin-bottom: 1.25rem;
   letter-spacing: -0.01em;
-}
-
-.gateway-pill-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--text-secondary);
 }
 
 /* Header Action Row */

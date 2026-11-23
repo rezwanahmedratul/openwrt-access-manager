@@ -31,12 +31,7 @@
   .sidebar-bottom {
     align-items: center;
     padding-top: 1rem;
-  }
-  .system-status-row span:not(.status-indicator-dot) {
     display: none;
-  }
-  .status-indicator-dot {
-    margin: 0 auto;
   }
   .main-wrapper {
     margin-left: 72px;
@@ -265,11 +260,6 @@
     font-weight: 600 !important;
     white-space: nowrap !important;
     flex-shrink: 0 !important;
-  }
-
-  .pending-dot-pulse {
-    width: 6px !important;
-    height: 6px !important;
   }
 
   .pending-count-badge {

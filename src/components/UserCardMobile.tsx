@@ -74,7 +74,6 @@ export const UserCardMobile: React.FC<UserCardMobileProps> = ({
             </span>
           ) : (
             <span className={`status-badge-capsule status-badge-${user.status}`}>
-              <span className="status-green-dot"></span>
               <span>{user.status}</span>
             </span>
           )}
@@ -89,9 +88,10 @@ export const UserCardMobile: React.FC<UserCardMobileProps> = ({
                   fontSize: '0.64rem',
                   fontWeight: 600,
                   padding: '0.12rem 0.35rem',
-                  borderRadius: '9999px',
-                  backgroundColor: 'rgba(239, 68, 68, 0.12)',
-                  color: '#ef4444',
+                  borderRadius: 'var(--radius-pill)',
+                  backgroundColor: 'var(--bg-pill)',
+                  color: 'var(--text-muted)',
+                  border: '1px solid var(--border-subtle)',
                 }}
               >
                 Expired
@@ -105,9 +105,10 @@ export const UserCardMobile: React.FC<UserCardMobileProps> = ({
                   fontSize: '0.64rem',
                   fontWeight: 600,
                   padding: '0.12rem 0.35rem',
-                  borderRadius: '9999px',
-                  backgroundColor: 'rgba(245, 158, 11, 0.12)',
-                  color: '#f59e0b',
+                  borderRadius: 'var(--radius-pill)',
+                  backgroundColor: 'var(--bg-pill)',
+                  color: 'var(--text-primary)',
+                  border: '1px solid var(--border-subtle)',
                 }}
               >
                 Temp
@@ -124,9 +125,10 @@ export const UserCardMobile: React.FC<UserCardMobileProps> = ({
                 fontSize: '0.64rem',
                 fontWeight: 600,
                 padding: '0.12rem 0.35rem',
-                borderRadius: '9999px',
-                backgroundColor: 'rgba(99, 102, 241, 0.12)',
-                color: '#6366f1',
+                borderRadius: 'var(--radius-pill)',
+                backgroundColor: 'var(--bg-pill)',
+                color: 'var(--text-secondary)',
+                border: '1px solid var(--border-subtle)',
               }}
             >
               Scheduled

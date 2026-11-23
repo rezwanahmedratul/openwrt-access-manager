@@ -115,14 +115,6 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
 
   return (
     <div className="history-page-wrapper page-content-animated" key="history">
-      {/* Small Top Pill */}
-      <div>
-        <div className="gateway-pill">
-          <span className="gateway-pill-dot"></span>
-          <span>Audit Trail &amp; Releases</span>
-        </div>
-      </div>
-
       {/* Header Row */}
       <div className="header-row">
         <div className="title-col">

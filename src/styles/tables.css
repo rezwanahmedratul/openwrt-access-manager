@@ -303,9 +303,9 @@
 }
 
 .mobile-action-icon-btn.mobile-delete-btn:hover {
-  color: #ef4444;
-  border-color: #ef4444;
-  background: rgba(239, 68, 68, 0.08);
+  color: var(--text-primary);
+  border-color: var(--border-strong);
+  background: var(--bg-hover);
 }
 
 .mobile-user-card-mac-row {
@@ -359,55 +359,36 @@
   padding: 0.2rem 0.6rem;
   border-radius: var(--radius-pill);
   font-size: 0.68rem;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   white-space: nowrap;
+  border: 1px solid var(--border-subtle);
 }
 
 .status-badge-applied {
   background: var(--status-applied-bg);
   color: var(--status-applied-text);
-}
-.status-badge-applied .status-green-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--status-applied-dot);
+  border-color: var(--border-subtle);
 }
 
 .status-badge-added {
   background: var(--status-added-bg);
   color: var(--status-added-text);
-}
-.status-badge-added .status-green-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--status-added-dot);
+  border-color: var(--status-added-bg);
 }
 
 .status-badge-modified {
   background: var(--status-modified-bg);
   color: var(--status-modified-text);
-}
-.status-badge-modified .status-green-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--status-modified-dot);
+  border-color: var(--border-subtle);
 }
 
 .status-badge-deleted {
   background: var(--status-deleted-bg);
   color: var(--status-deleted-text);
+  border-color: var(--border-subtle);
   text-decoration: line-through;
-}
-.status-badge-deleted .status-green-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--status-deleted-dot);
 }
 
 .user-name-cell {

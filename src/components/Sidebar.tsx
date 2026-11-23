@@ -15,7 +15,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
           <div className="brand-icon-box">W</div>
           <div className="brand-text-col">
             <span className="brand-title">OpenWrt Manager</span>
-            <span className="brand-subtitle">GATEWAY ACCESS</span>
           </div>
         </div>
 
@@ -130,7 +129,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
       {/* Sidebar Footer Status */}
       <div className="sidebar-bottom">
         <div className="system-status-row">
-          <span className="status-indicator-dot"></span>
           <span>System Online</span>
         </div>
         <span className="system-version-sub">OpenWrt v23.05.5</span>

@@ -217,7 +217,6 @@ export default function DashboardPage() {
           {notification && (
             <div className={`toast-notice ${notification.type === 'error' ? 'toast-error' : 'toast-success'}`}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <span className="toast-dot" />
                 <span>{notification.message}</span>
               </div>
               <button

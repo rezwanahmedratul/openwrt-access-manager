@@ -44,7 +44,6 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
         <div className="brand-text-col">
           <span className="brand-title" style={{ fontSize: '0.88rem', lineHeight: 1.1 }}>OpenWrt</span>
-          <span className="brand-subtitle" style={{ fontSize: '0.55rem' }}>GATEWAY</span>
         </div>
       </div>
 

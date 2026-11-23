@@ -24,7 +24,6 @@ export const DashboardStatsCards: React.FC<DashboardStatsCardsProps> = ({
             </svg>
             <span className="stat-title-label">PUBLISHED USERS</span>
           </div>
-          <span className="stat-index-badge">01</span>
         </div>
         <div className="stat-big-value">{stats.total_users}</div>
         <div className="stat-footer-text">Active client rules</div>
@@ -46,10 +45,9 @@ export const DashboardStatsCards: React.FC<DashboardStatsCardsProps> = ({
             </svg>
             <span className="stat-title-label">GROUPS</span>
           </div>
-          <span className="stat-index-badge">02</span>
         </div>
         <div className="stat-big-value">{stats.total_groups}</div>
-        <div className="stat-footer-text">Click to add/delete groups</div>
+        <div className="stat-footer-text">Managed groups</div>
       </div>
 
       {/* Card 3: Pending Draft */}
@@ -64,11 +62,10 @@ export const DashboardStatsCards: React.FC<DashboardStatsCardsProps> = ({
             </svg>
             <span className="stat-title-label">PENDING DRAFT</span>
           </div>
-          <span className="stat-index-badge">03</span>
         </div>
         <div className="stat-big-value">{stats.pending_changes}</div>
         <div className="stat-footer-text">
-          {stats.pending_changes > 0 ? 'Draft unapplied modifications' : 'Synchronized with router'}
+          {stats.pending_changes > 0 ? 'Unapplied changes' : 'Synced'}
         </div>
       </div>
 
@@ -82,13 +79,12 @@ export const DashboardStatsCards: React.FC<DashboardStatsCardsProps> = ({
             </svg>
             <span className="stat-title-label">CONFIG VERSION</span>
           </div>
-          <span className="stat-index-badge">04</span>
         </div>
         <div className="stat-big-value">v{stats.current_version ?? 1}</div>
         <div className="stat-footer-text">
           {stats.last_applied
-            ? `Live since ${new Date(stats.last_applied).toLocaleDateString('en-US')}`
-            : 'Live since 9/27/2026'}
+            ? `Applied ${new Date(stats.last_applied).toLocaleDateString('en-US')}`
+            : 'Live'}
         </div>
       </div>
     </div>

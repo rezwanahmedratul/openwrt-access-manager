@@ -34,14 +34,6 @@ export const AccountView: React.FC<AccountViewProps> = ({
 
   return (
     <div className="page-content-animated" key="account">
-      {/* Small Top Pill */}
-      <div>
-        <div className="gateway-pill">
-          <span className="gateway-pill-dot"></span>
-          <span>Identity & Role Privileges</span>
-        </div>
-      </div>
-
       {/* Account Headline */}
       <div className="header-row">
         <div className="title-col">

@@ -134,16 +134,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       {/* Top Headline */}
       <div className="header-row dashboard-header-row" style={{ marginBottom: '1.25rem' }}>
         <div className="title-col">
-          <div className="gateway-pill" style={{ marginBottom: '0.65rem' }}>
-            <span
-              className="gateway-pill-dot"
-              style={{
-                backgroundColor:
-                  stats.mac_auth && !stats.mac_auth.enabled ? '#eab308' : '#22c55e',
-              }}
-            ></span>
-            <span>Gateway Access Control</span>
-          </div>
           <h1 className="page-headline">Network Access Control</h1>
           <p className="page-description">
             Assign devices to firewall groups, manage MAC authentication bypass, and stage changes.

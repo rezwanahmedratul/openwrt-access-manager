@@ -87,14 +87,6 @@ export const AuditLogsView: React.FC<AuditLogsViewProps> = ({
 
   return (
     <div className="tab-pane-container page-content-animated" key="audit">
-      {/* Top Header Pill */}
-      <div>
-        <div className="gateway-pill">
-          <span className="gateway-pill-dot" style={{ backgroundColor: '#3b82f6' }}></span>
-          <span>Security &amp; Compliance Audit Trail</span>
-        </div>
-      </div>
-
       {/* Headline */}
       <div className="header-row">
         <div className="title-col">

@@ -35,11 +35,11 @@ export const MacAuthBannerCard: React.FC<MacAuthBannerCardProps> = ({
             </h3>
             {stats.mac_auth && !stats.mac_auth.enabled ? (
               <span className="mac-auth-badge-status mac-auth-badge-off">
-                ● Disabled (Open to All)
+                Disabled (Open to All)
               </span>
             ) : (
               <span className="mac-auth-badge-status mac-auth-badge-on">
-                ● Enabled (Enforced)
+                Enabled (Enforced)
               </span>
             )}
           </div>

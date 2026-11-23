@@ -39,26 +39,6 @@
   font-size: 0.88rem;
 }
 
-.pending-dot-pulse {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--btn-primary-text);
-  flex-shrink: 0;
-  animation: pendingPulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-}
-
-@keyframes pendingPulse {
-  0%, 100% {
-    opacity: 1;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 0.35;
-    transform: scale(0.85);
-  }
-}
-
 .pending-count-badge {
   display: none;
 }
@@ -154,11 +134,11 @@
 }
 
 .toast-notice.toast-success {
-  border-left: 3px solid var(--status-applied-dot);
+  border-left: 3px solid var(--text-primary);
 }
 
 .toast-notice.toast-error {
-  border-left: 3px solid #ef4444;
+  border-left: 3px solid var(--text-muted);
 }
 
 
@@ -356,7 +336,7 @@
   align-items: center;
   gap: 0.45rem;
   font-size: 0.78rem;
-  color: #DC2626;
+  color: var(--text-secondary);
   margin-top: 0.6rem;
   font-weight: 500;
   animation: fadeInDown 0.25s ease-out;
@@ -374,7 +354,7 @@
   padding: 0.2rem 0.55rem;
   border-radius: var(--radius-pill);
   font-size: 0.7rem;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
@@ -382,6 +362,7 @@
 .badge-role-admin {
   background: var(--btn-primary-bg);
   color: var(--btn-primary-text);
+  border: 1px solid var(--border-strong);
 }
 
 .badge-role-subadmin {
@@ -397,11 +378,11 @@
   padding: 0.15rem 0.5rem;
   border-radius: var(--radius-pill);
   font-size: 0.68rem;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.03em;
-  background: rgba(220, 38, 38, 0.1);
-  color: #DC2626;
-  border: 1px solid rgba(220, 38, 38, 0.25);
+  background: var(--bg-pill);
+  color: var(--text-primary);
+  border: 1px solid var(--border-strong);
 }
 
 .badge-standard {
@@ -475,11 +456,11 @@
   padding: 0.2rem 0.55rem;
   border-radius: var(--radius-pill);
   font-size: 0.7rem;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.02em;
-  background: rgba(220, 38, 38, 0.12);
-  color: #DC2626;
-  border: 1px solid rgba(220, 38, 38, 0.3);
+  background: var(--bg-pill);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-strong);
 }
 
 .badge-internet {
@@ -491,9 +472,9 @@
   font-size: 0.7rem;
   font-weight: 600;
   letter-spacing: 0.02em;
-  background: rgba(16, 185, 129, 0.08);
-  color: #047857;
-  border: 1px solid rgba(16, 185, 129, 0.25);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  border: 1px solid var(--border-subtle);
 }
 
 .conflict-modal-overlay {
@@ -528,8 +509,8 @@
   display: flex;
   gap: 0.85rem;
   align-items: flex-start;
-  background: rgba(245, 158, 11, 0.08);
-  border: 1px solid rgba(245, 158, 11, 0.3);
+  background: var(--bg-pill);
+  border: 1px solid var(--border-strong);
   border-radius: var(--radius-md);
   padding: 1rem 1.15rem;
 }
@@ -839,9 +820,9 @@
 
 .quick-add-dup-warning {
   font-size: 0.75rem;
-  color: #f59e0b;
-  background: rgba(245, 158, 11, 0.1);
-  border: 1px solid rgba(245, 158, 11, 0.25);
+  color: var(--text-secondary);
+  background: var(--bg-pill);
+  border: 1px solid var(--border-strong);
   padding: 0.4rem 0.75rem;
   border-radius: var(--radius-sm);
   display: flex;
@@ -1010,21 +991,27 @@
   padding: 0.2rem 0.55rem;
   border-radius: 9999px;
   font-weight: 600;
+  background: var(--bg-pill);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
 }
 
 .import-stat-pill.valid {
-  background: rgba(16, 185, 129, 0.12);
-  color: #10b981;
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  border-color: var(--border-strong);
 }
 
 .import-stat-pill.warning {
-  background: rgba(245, 158, 11, 0.12);
-  color: #f59e0b;
+  background: var(--bg-pill);
+  color: var(--text-secondary);
+  border-color: var(--border-subtle);
 }
 
 .import-stat-pill.error {
-  background: rgba(239, 68, 68, 0.12);
-  color: #ef4444;
+  background: var(--bg-pill);
+  color: var(--text-muted);
+  border-color: var(--border-subtle);
 }
 
 /* ============================================================
@@ -1052,26 +1039,26 @@
   left: 0;
   top: 0;
   bottom: 0;
-  width: 4px;
+  width: 3px;
   background: transparent;
   transition: background-color var(--transition-fast);
 }
 
 .dashboard-mac-auth-banner.is-enabled {
-  border-color: rgba(34, 197, 94, 0.28);
+  border-color: var(--border-strong);
 }
 
 .dashboard-mac-auth-banner.is-enabled::before {
-  background: #22c55e;
+  background: var(--text-primary);
 }
 
 .dashboard-mac-auth-banner.is-disabled {
-  border-color: rgba(234, 179, 8, 0.38);
-  background: linear-gradient(to right, rgba(234, 179, 8, 0.04), var(--bg-card) 45%);
+  border-color: var(--border-subtle);
+  background: var(--bg-card);
 }
 
 .dashboard-mac-auth-banner.is-disabled::before {
-  background: #eab308;
+  background: var(--text-muted);
 }
 
 .dashboard-mac-auth-banner:hover {
@@ -1097,40 +1084,21 @@
   justify-content: center;
   flex-shrink: 0;
   transition: all var(--transition-fast);
+  background: var(--bg-pill);
+  color: var(--text-primary);
+  border: 1px solid var(--border-subtle);
 }
 
 .mac-auth-icon-wrapper.icon-enabled {
-  background: rgba(34, 197, 94, 0.1);
-  color: #22c55e;
-  border: 1px solid rgba(34, 197, 94, 0.2);
+  background: var(--bg-pill);
+  color: var(--text-primary);
+  border: 1px solid var(--border-strong);
 }
 
 .mac-auth-icon-wrapper.icon-disabled {
-  background: rgba(234, 179, 8, 0.12);
-  color: #eab308;
-  border: 1px solid rgba(234, 179, 8, 0.25);
-}
-
-.mac-auth-status-dot {
-  position: absolute;
-  top: -2px;
-  right: -2px;
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  border: 2px solid var(--bg-card);
-}
-
-.mac-auth-status-dot.dot-enabled {
-  background-color: #22c55e;
-  box-shadow: 0 0 6px rgba(34, 197, 94, 0.6);
-  animation: pulseRing 2s ease infinite;
-}
-
-.mac-auth-status-dot.dot-disabled {
-  background-color: #eab308;
-  box-shadow: 0 0 6px rgba(234, 179, 8, 0.6);
-  animation: pulseRing 1.5s ease infinite;
+  background: var(--bg-card-subtle);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-subtle);
 }
 
 .mac-auth-text-content {
@@ -1160,7 +1128,7 @@
   align-items: center;
   gap: 0.35rem;
   font-size: 0.72rem;
-  font-weight: 700;
+  font-weight: 600;
   padding: 0.18rem 0.6rem;
   border-radius: var(--radius-pill);
   letter-spacing: 0.02em;
@@ -1168,25 +1136,27 @@
 }
 
 .mac-auth-status-badge.badge-enforced {
-  background: rgba(34, 197, 94, 0.12);
-  color: #16a34a;
-  border: 1px solid rgba(34, 197, 94, 0.25);
+  background: var(--bg-pill);
+  color: var(--text-primary);
+  border: 1px solid var(--border-strong);
 }
 
 [data-theme='dark'] .mac-auth-status-badge.badge-enforced {
-  background: rgba(34, 197, 94, 0.18);
-  color: #4ade80;
+  background: var(--bg-pill);
+  color: var(--text-primary);
+  border: 1px solid var(--border-strong);
 }
 
 .mac-auth-status-badge.badge-bypassed {
-  background: rgba(234, 179, 8, 0.12);
-  color: #ca8a04;
-  border: 1px solid rgba(234, 179, 8, 0.3);
+  background: var(--bg-card-subtle);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-subtle);
 }
 
 [data-theme='dark'] .mac-auth-status-badge.badge-bypassed {
-  background: rgba(234, 179, 8, 0.18);
-  color: #facc15;
+  background: var(--bg-card-subtle);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-subtle);
 }
 
 .mac-auth-subtext {
@@ -1217,9 +1187,9 @@
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  background: rgba(234, 179, 8, 0.1);
+  background: var(--bg-pill);
   color: var(--text-primary);
-  border: 1px solid rgba(234, 179, 8, 0.25);
+  border: 1px solid var(--border-strong);
   border-radius: var(--radius-pill);
   padding: 0.22rem 0.65rem;
   font-size: 0.75rem;

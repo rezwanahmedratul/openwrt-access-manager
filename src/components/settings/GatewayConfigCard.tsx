@@ -59,7 +59,6 @@ export const GatewayConfigCard: React.FC<GatewayConfigCardProps> = ({
           </div>
           <div className="settings-row-control">
             <div className="gateway-pill" style={{ margin: 0 }}>
-              <span className="gateway-pill-dot"></span>
               <span style={{ fontWeight: 600 }}>Active &amp; Polling</span>
             </div>
             {gatewayLatency !== null && (

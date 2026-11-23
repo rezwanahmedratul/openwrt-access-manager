@@ -61,12 +61,6 @@ export const RouterHealthCard: React.FC<RouterHealthCardProps> = ({
   const wanStatus = (telemetry?.wan_status || (isOnline ? 'online' : 'offline')).toLowerCase();
   const isWanOnline = wanStatus === 'online' || wanStatus === 'connected';
 
-  const getUsageColor = (val: number) => {
-    if (val >= 85) return '#ef4444';
-    if (val >= 65) return '#f59e0b';
-    return '#10b981';
-  };
-
   return (
     <div className="settings-section-card router-health-card" style={{ marginBottom: '1.25rem', padding: '1.25rem' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
@@ -79,8 +73,9 @@ export const RouterHealthCard: React.FC<RouterHealthCardProps> = ({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              background: isOnline ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
-              color: isOnline ? '#10b981' : '#ef4444',
+              background: 'var(--bg-card-subtle)',
+              color: 'var(--text-primary)',
+              border: '1px solid var(--border-subtle)',
             }}
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -93,35 +88,26 @@ export const RouterHealthCard: React.FC<RouterHealthCardProps> = ({
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <h3 style={{ margin: 0, fontSize: '0.98rem', fontWeight: 600, color: 'var(--text-primary)' }}>
-                Router Daemon Health &amp; Telemetry
+                Router Daemon Telemetry
               </h3>
               <span
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: '0.35rem',
                   fontSize: '0.72rem',
                   fontWeight: 600,
                   padding: '0.2rem 0.55rem',
-                  borderRadius: '9999px',
-                  backgroundColor: isOnline ? 'var(--status-applied-bg)' : '#fef2f2',
-                  color: isOnline ? 'var(--status-applied-text)' : '#dc2626',
-                  border: `1px solid ${isOnline ? 'rgba(16, 185, 129, 0.25)' : 'rgba(239, 68, 68, 0.25)'}`,
+                  borderRadius: 'var(--radius-pill)',
+                  backgroundColor: 'var(--bg-pill)',
+                  color: 'var(--text-secondary)',
+                  border: '1px solid var(--border-subtle)',
                 }}
               >
-                <span
-                  style={{
-                    width: '6px',
-                    height: '6px',
-                    borderRadius: '50%',
-                    backgroundColor: isOnline ? '#10b981' : '#ef4444',
-                  }}
-                />
-                {isOnline ? 'ONLINE' : 'OFFLINE / STALE'}
+                {isOnline ? 'Online' : 'Offline'}
               </span>
             </div>
             <p style={{ margin: '0.2rem 0 0', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-              OpenWrt Daemon: {telemetry?.openwrt_version || 'OpenWrt 23.05.5'} • Last heartbeat: {formatTimeAgo(lastSeenIso)}
+              OpenWrt Daemon: {telemetry?.openwrt_version || 'OpenWrt 23.05.5'} • Heartbeat: {formatTimeAgo(lastSeenIso)}
             </p>
           </div>
         </div>
@@ -158,7 +144,7 @@ export const RouterHealthCard: React.FC<RouterHealthCardProps> = ({
             {formatUptime(telemetry?.uptime)}
           </div>
           <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
-            System power continuous
+            System uptime
           </div>
         </div>
 
@@ -168,7 +154,7 @@ export const RouterHealthCard: React.FC<RouterHealthCardProps> = ({
             <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.04em' }}>
               CPU USAGE
             </span>
-            <span style={{ fontSize: '0.75rem', fontWeight: 600, color: getUsageColor(cpuPercent) }}>
+            <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-primary)' }}>
               {telemetry?.cpu_usage != null ? `${telemetry.cpu_usage.toFixed(1)}%` : '0%'}
             </span>
           </div>
@@ -177,14 +163,14 @@ export const RouterHealthCard: React.FC<RouterHealthCardProps> = ({
               style={{
                 width: `${cpuPercent}%`,
                 height: '100%',
-                background: getUsageColor(cpuPercent),
+                background: 'var(--text-primary)',
                 borderRadius: '3px',
                 transition: 'width 0.3s ease',
               }}
             />
           </div>
           <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.35rem' }}>
-            Load average load
+            Load average
           </div>
         </div>
 
@@ -194,7 +180,7 @@ export const RouterHealthCard: React.FC<RouterHealthCardProps> = ({
             <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.04em' }}>
               MEMORY USAGE
             </span>
-            <span style={{ fontSize: '0.75rem', fontWeight: 600, color: getUsageColor(memPercent) }}>
+            <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-primary)' }}>
               {telemetry?.memory_usage != null ? `${telemetry.memory_usage.toFixed(1)}%` : '0%'}
             </span>
           </div>
@@ -203,7 +189,7 @@ export const RouterHealthCard: React.FC<RouterHealthCardProps> = ({
               style={{
                 width: `${memPercent}%`,
                 height: '100%',
-                background: getUsageColor(memPercent),
+                background: 'var(--text-primary)',
                 borderRadius: '3px',
                 transition: 'width 0.3s ease',
               }}
@@ -220,20 +206,12 @@ export const RouterHealthCard: React.FC<RouterHealthCardProps> = ({
             WAN STATUS
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', marginTop: '0.25rem' }}>
-            <span
-              style={{
-                width: '8px',
-                height: '8px',
-                borderRadius: '50%',
-                backgroundColor: isWanOnline ? '#10b981' : '#ef4444',
-              }}
-            />
-            <span style={{ fontSize: '1rem', fontWeight: 700, color: isWanOnline ? '#10b981' : '#ef4444' }}>
+            <span style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)' }}>
               {isWanOnline ? 'Connected' : 'Disconnected'}
             </span>
           </div>
           <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
-            Gateway internet link
+            Internet link
           </div>
         </div>
 
@@ -248,7 +226,7 @@ export const RouterHealthCard: React.FC<RouterHealthCardProps> = ({
           <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
             {stats.current_version && telemetry?.config_version && telemetry.config_version < stats.current_version
               ? 'Update pending pull'
-              : 'Synced with cloud'}
+              : 'Synced'}
           </div>
         </div>
 
@@ -257,10 +235,10 @@ export const RouterHealthCard: React.FC<RouterHealthCardProps> = ({
           <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.04em' }}>
             LAST SYNC
           </div>
-          <div style={{ fontSize: '0.92rem', fontWeight: 600, color: telemetry?.last_sync_error ? '#ef4444' : 'var(--text-primary)', marginTop: '0.25rem' }}>
+          <div style={{ fontSize: '0.92rem', fontWeight: 600, color: 'var(--text-primary)', marginTop: '0.25rem' }}>
             {telemetry?.last_sync_error ? 'Failed' : 'Successful'}
           </div>
-          <div style={{ fontSize: '0.72rem', color: telemetry?.last_sync_error ? '#ef4444' : 'var(--text-muted)', marginTop: '0.2rem' }} title={telemetry?.last_sync_error || undefined}>
+          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.2rem' }} title={telemetry?.last_sync_error || undefined}>
             {telemetry?.last_sync_error ? telemetry.last_sync_error.slice(0, 24) + '...' : formatTimeAgo(telemetry?.last_sync)}
           </div>
         </div>
