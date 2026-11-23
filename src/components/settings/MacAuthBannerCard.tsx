@@ -35,11 +35,11 @@ export const MacAuthBannerCard: React.FC<MacAuthBannerCardProps> = ({
             </h3>
             {stats.mac_auth && !stats.mac_auth.enabled ? (
               <span className="mac-auth-badge-status mac-auth-badge-off">
-                Disabled (Open to All)
+                Disabled
               </span>
             ) : (
               <span className="mac-auth-badge-status mac-auth-badge-on">
-                Enabled (Enforced)
+                Enabled
               </span>
             )}
           </div>
@@ -79,7 +79,7 @@ export const MacAuthBannerCard: React.FC<MacAuthBannerCardProps> = ({
           onClick={onToggleMacAuthClick}
           style={{ fontSize: '0.82rem', padding: '0.55rem 1.1rem', fontWeight: 700 }}
         >
-          {isUpdatingMacAuth ? 'Updating...' : stats.mac_auth && !stats.mac_auth.enabled ? 'Turn ON MAC Auth' : 'Turn OFF MAC Auth'}
+          {isUpdatingMacAuth ? 'Updating...' : stats.mac_auth && !stats.mac_auth.enabled ? 'Enable' : 'Disable'}
         </button>
       </div>
     </div>

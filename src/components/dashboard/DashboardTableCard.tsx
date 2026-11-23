@@ -182,7 +182,7 @@ export const DashboardTableCard: React.FC<DashboardTableCardProps> = ({
               style={{ fontSize: '0.75rem', padding: '0.35rem 0.65rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
               title="Open dedicated page with all users"
             >
-              <span>See All ({users.length})</span>
+              <span>See All</span>
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <line x1="5" y1="12" x2="19" y2="12" />
                 <polyline points="12 5 19 12 12 19" />

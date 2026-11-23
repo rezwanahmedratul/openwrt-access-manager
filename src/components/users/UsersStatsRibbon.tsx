@@ -16,14 +16,11 @@ export const UsersStatsRibbon: React.FC<UsersStatsRibbonProps> = ({ users }) => 
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ opacity: 0.7 }}>
               <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
               <circle cx="9" cy="7" r="4" />
-              <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-              <path d="M16 3.13a4 4 0 0 1 0 7.75" />
             </svg>
-            <span className="stat-title-label">TOTAL DEVICES</span>
+            <span className="stat-title-label">TOTAL</span>
           </div>
         </div>
         <div className="stat-big-value">{users.length}</div>
-        <div className="stat-footer-text">Registered MAC addresses</div>
       </div>
 
       <div className="stat-card-box">
@@ -33,13 +30,12 @@ export const UsersStatsRibbon: React.FC<UsersStatsRibbonProps> = ({ users }) => 
               <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
               <polyline points="22 4 12 14.01 9 11.01" />
             </svg>
-            <span className="stat-title-label">ACTIVE / APPLIED</span>
+            <span className="stat-title-label">APPLIED</span>
           </div>
         </div>
         <div className="stat-big-value">
           {users.filter((u) => u.status === 'applied').length}
         </div>
-        <div className="stat-footer-text">Applied rules</div>
       </div>
 
       <div className="stat-card-box">
@@ -49,13 +45,12 @@ export const UsersStatsRibbon: React.FC<UsersStatsRibbonProps> = ({ users }) => 
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
               <polyline points="14 2 14 8 20 8" />
             </svg>
-            <span className="stat-title-label">PENDING SYNC</span>
+            <span className="stat-title-label">PENDING</span>
           </div>
         </div>
         <div className="stat-big-value">
           {users.filter((u) => u.status !== 'applied').length}
         </div>
-        <div className="stat-footer-text">Pending rules</div>
       </div>
 
       <div className="stat-card-box">
@@ -71,7 +66,6 @@ export const UsersStatsRibbon: React.FC<UsersStatsRibbonProps> = ({ users }) => 
         <div className="stat-big-value">
           {users.filter((u) => u.groups?.some((g) => g.is_no_internet)).length}
         </div>
-        <div className="stat-footer-text">WAN access blocked</div>
       </div>
     </div>
   );

@@ -88,7 +88,7 @@ export const RouterHealthCard: React.FC<RouterHealthCardProps> = ({
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <h3 style={{ margin: 0, fontSize: '0.98rem', fontWeight: 600, color: 'var(--text-primary)' }}>
-                Router Daemon Telemetry
+                Router Status
               </h3>
               <span
                 style={{
@@ -107,7 +107,7 @@ export const RouterHealthCard: React.FC<RouterHealthCardProps> = ({
               </span>
             </div>
             <p style={{ margin: '0.2rem 0 0', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-              OpenWrt Daemon: {telemetry?.openwrt_version || 'OpenWrt 23.05.5'} • Heartbeat: {formatTimeAgo(lastSeenIso)}
+              OpenWrt {telemetry?.openwrt_version?.replace(/^OpenWrt\s+/i, '') || '23.05.5'} • Heartbeat: {formatTimeAgo(lastSeenIso)}
             </p>
           </div>
         </div>
@@ -123,7 +123,7 @@ export const RouterHealthCard: React.FC<RouterHealthCardProps> = ({
               <polyline points="1 4 1 10 7 10" />
               <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
             </svg>
-            <span>Refresh Telemetry</span>
+            <span>Refresh</span>
           </button>
         )}
       </div>
@@ -138,13 +138,10 @@ export const RouterHealthCard: React.FC<RouterHealthCardProps> = ({
         {/* Metric 1: Uptime */}
         <div style={{ background: 'var(--bg-card-subtle)', padding: '0.75rem', borderRadius: '6px', border: '1px solid var(--border-subtle)' }}>
           <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.04em' }}>
-            ROUTER UPTIME
+            UPTIME
           </div>
           <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)', marginTop: '0.25rem' }}>
             {formatUptime(telemetry?.uptime)}
-          </div>
-          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
-            System uptime
           </div>
         </div>
 
@@ -152,7 +149,7 @@ export const RouterHealthCard: React.FC<RouterHealthCardProps> = ({
         <div style={{ background: 'var(--bg-card-subtle)', padding: '0.75rem', borderRadius: '6px', border: '1px solid var(--border-subtle)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.04em' }}>
-              CPU USAGE
+              CPU
             </span>
             <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-primary)' }}>
               {telemetry?.cpu_usage != null ? `${telemetry.cpu_usage.toFixed(1)}%` : '0%'}
@@ -169,16 +166,13 @@ export const RouterHealthCard: React.FC<RouterHealthCardProps> = ({
               }}
             />
           </div>
-          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.35rem' }}>
-            Load average
-          </div>
         </div>
 
         {/* Metric 3: Memory Usage */}
         <div style={{ background: 'var(--bg-card-subtle)', padding: '0.75rem', borderRadius: '6px', border: '1px solid var(--border-subtle)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.04em' }}>
-              MEMORY USAGE
+              MEMORY
             </span>
             <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-primary)' }}>
               {telemetry?.memory_usage != null ? `${telemetry.memory_usage.toFixed(1)}%` : '0%'}
@@ -195,38 +189,27 @@ export const RouterHealthCard: React.FC<RouterHealthCardProps> = ({
               }}
             />
           </div>
-          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.35rem' }}>
-            RAM utilization
-          </div>
         </div>
 
         {/* Metric 4: WAN Connectivity */}
         <div style={{ background: 'var(--bg-card-subtle)', padding: '0.75rem', borderRadius: '6px', border: '1px solid var(--border-subtle)' }}>
           <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.04em' }}>
-            WAN STATUS
+            WAN
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', marginTop: '0.25rem' }}>
             <span style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)' }}>
               {isWanOnline ? 'Connected' : 'Disconnected'}
             </span>
           </div>
-          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
-            Internet link
-          </div>
         </div>
 
         {/* Metric 5: Active Config Version */}
         <div style={{ background: 'var(--bg-card-subtle)', padding: '0.75rem', borderRadius: '6px', border: '1px solid var(--border-subtle)' }}>
           <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.04em' }}>
-            ROUTER CONFIG
+            VERSION
           </div>
           <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)', marginTop: '0.25rem' }}>
             v{telemetry?.config_version ?? stats.current_version ?? 1}
-          </div>
-          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
-            {stats.current_version && telemetry?.config_version && telemetry.config_version < stats.current_version
-              ? 'Update pending pull'
-              : 'Synced'}
           </div>
         </div>
 
@@ -236,10 +219,7 @@ export const RouterHealthCard: React.FC<RouterHealthCardProps> = ({
             LAST SYNC
           </div>
           <div style={{ fontSize: '0.92rem', fontWeight: 600, color: 'var(--text-primary)', marginTop: '0.25rem' }}>
-            {telemetry?.last_sync_error ? 'Failed' : 'Successful'}
-          </div>
-          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.2rem' }} title={telemetry?.last_sync_error || undefined}>
-            {telemetry?.last_sync_error ? telemetry.last_sync_error.slice(0, 24) + '...' : formatTimeAgo(telemetry?.last_sync)}
+            {telemetry?.last_sync_error ? 'Failed' : formatTimeAgo(telemetry?.last_sync)}
           </div>
         </div>
       </div>

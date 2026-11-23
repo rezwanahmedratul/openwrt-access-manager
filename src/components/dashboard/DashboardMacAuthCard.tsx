@@ -38,7 +38,7 @@ export const DashboardMacAuthCard: React.FC<DashboardMacAuthCardProps> = ({
         <div className="mac-auth-text-content">
           <div className="mac-auth-header-line">
             <h3 className="mac-auth-title">
-              {isMacAuthDisabled ? 'MAC Authentication Bypassed' : 'MAC Authentication Active'}
+              MAC Authentication
             </h3>
             <span className="mac-auth-status-badge">
               {isMacAuthDisabled ? 'Bypassed' : 'Active'}
@@ -73,7 +73,7 @@ export const DashboardMacAuthCard: React.FC<DashboardMacAuthCardProps> = ({
             <div className="mac-auth-schedule-row">
               <span className="mac-auth-timer-pill pill-permanent">
                 <IconInfinity size={14} />
-                <span>Permanently disabled until manually re-enabled</span>
+                <span>Disabled until re-enabled</span>
               </span>
             </div>
           )}
@@ -91,17 +91,17 @@ export const DashboardMacAuthCard: React.FC<DashboardMacAuthCardProps> = ({
           {isUpdatingMacAuth ? (
             <>
               <span className="loading-spinner" style={{ width: '13px', height: '13px', borderTopColor: 'currentColor' }}></span>
-              <span>Updating Gateway...</span>
+              <span>Updating...</span>
             </>
           ) : isMacAuthDisabled ? (
             <>
               <IconLock size={14} />
-              <span>Turn ON MAC Auth</span>
+              <span>Enable</span>
             </>
           ) : (
             <>
               <IconUnlock size={14} />
-              <span>Turn OFF MAC Auth</span>
+              <span>Disable</span>
             </>
           )}
         </button>

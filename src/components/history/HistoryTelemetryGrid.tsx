@@ -18,7 +18,7 @@ export const HistoryTelemetryGrid: React.FC<HistoryTelemetryGridProps> = ({
     <div className="history-telemetry-grid">
       <div className="history-telemetry-card">
         <div className="history-telemetry-header">
-          <span>Published Releases</span>
+          <span>Releases</span>
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ flexShrink: 0, opacity: 0.7 }}>
             <polygon points="12 2 2 7 12 12 22 7 12 2" />
             <polyline points="2 17 12 22 22 17" />
@@ -27,29 +27,24 @@ export const HistoryTelemetryGrid: React.FC<HistoryTelemetryGridProps> = ({
         </div>
         <div className="history-telemetry-value">
           <span>{historyCount}</span>
-          <span className="history-telemetry-unit">versions</span>
-        </div>
-        <div className="history-telemetry-subtext">
-          <span>Total immutable snapshots</span>
         </div>
       </div>
 
       <div className="history-telemetry-card">
         <div className="history-telemetry-header">
           <span>Active Release</span>
-          <span className="history-live-pill">Live</span>
         </div>
         <div className="history-telemetry-value">
           v{liveHistoryItem ? liveHistoryItem.version : (stats.current_version || 1)}
         </div>
         <div className="history-telemetry-subtext">
-          <span>{liveHistoryItem?.created_at ? new Date(liveHistoryItem.created_at).toLocaleDateString() : 'Currently deployed'}</span>
+          <span>{liveHistoryItem?.created_at ? new Date(liveHistoryItem.created_at).toLocaleDateString() : ''}</span>
         </div>
       </div>
 
       <div className="history-telemetry-card">
         <div className="history-telemetry-header">
-          <span>Active Devices</span>
+          <span>Devices</span>
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ flexShrink: 0, opacity: 0.7 }}>
             <rect x="5" y="2" width="14" height="20" rx="2" ry="2" />
             <line x1="12" y1="18" x2="12.01" y2="18" />
@@ -57,16 +52,12 @@ export const HistoryTelemetryGrid: React.FC<HistoryTelemetryGridProps> = ({
         </div>
         <div className="history-telemetry-value">
           <span>{liveHistoryItem ? liveHistoryItem.user_count : (stats.total_users || 0)}</span>
-          <span className="history-telemetry-unit">devices</span>
-        </div>
-        <div className="history-telemetry-subtext">
-          <span>Firewall rules compiled</span>
         </div>
       </div>
 
       <div className="history-telemetry-card">
         <div className="history-telemetry-header">
-          <span>Config Hash</span>
+          <span>Hash</span>
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ flexShrink: 0, opacity: 0.7 }}>
             <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
           </svg>
@@ -75,7 +66,7 @@ export const HistoryTelemetryGrid: React.FC<HistoryTelemetryGridProps> = ({
           {liveHistoryItem?.hash ? liveHistoryItem.hash.substring(0, 10) + '…' : 'None'}
         </div>
         <div className="history-telemetry-subtext">
-          <span>SHA-256 fingerprint</span>
+          <span>SHA-256</span>
         </div>
       </div>
     </div>

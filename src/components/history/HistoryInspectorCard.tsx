@@ -59,11 +59,11 @@ export const HistoryInspectorCard: React.FC<HistoryInspectorCardProps> = ({
 
             <div className="history-inspector-header-top">
               <div className="history-inspector-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                <span>Release v{selectedHistoryItem.version}</span>
+                <span>v{selectedHistoryItem.version}</span>
                 {selectedHistoryItem.is_current ? (
-                  <span className="history-live-pill">Live Active</span>
+                  <span className="history-live-pill">Active</span>
                 ) : (
-                  <span className="history-archived-pill">Archived Version</span>
+                  <span className="history-archived-pill">Archived</span>
                 )}
                 {renderDeploymentStatusBadge(selectedHistoryItem.deployment_status, Boolean(selectedHistoryItem.rollback_from_version))}
                 {selectedHistoryItem.rollback_from_version && (

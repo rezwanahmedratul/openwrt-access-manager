@@ -33,7 +33,7 @@ export const GatewayConfigCard: React.FC<GatewayConfigCardProps> = ({
               <line x1="6" y1="6" x2="6.01" y2="6" />
               <line x1="6" y1="18" x2="6.01" y2="18" />
             </svg>
-            Router Gateway &amp; Polling
+            Router Gateway
           </h2>
           <p className="settings-section-desc">
             Connection status and parameters for the target OpenWrt router daemon.
@@ -59,7 +59,7 @@ export const GatewayConfigCard: React.FC<GatewayConfigCardProps> = ({
           </div>
           <div className="settings-row-control">
             <div className="gateway-pill" style={{ margin: 0 }}>
-              <span style={{ fontWeight: 600 }}>Active &amp; Polling</span>
+              <span style={{ fontWeight: 600 }}>Connected</span>
             </div>
             {gatewayLatency !== null && (
               <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>

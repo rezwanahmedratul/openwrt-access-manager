@@ -14,7 +14,7 @@ export const DashboardStatsCards: React.FC<DashboardStatsCardsProps> = ({
 }) => {
   return (
     <div className="stats-cards-row">
-      {/* Card 1: Published Users */}
+      {/* Card 1: Users */}
       <div className="stat-card-box">
         <div className="stat-top-row">
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -22,11 +22,10 @@ export const DashboardStatsCards: React.FC<DashboardStatsCardsProps> = ({
               <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
               <circle cx="9" cy="7" r="4" />
             </svg>
-            <span className="stat-title-label">PUBLISHED USERS</span>
+            <span className="stat-title-label">USERS</span>
           </div>
         </div>
         <div className="stat-big-value">{stats.total_users}</div>
-        <div className="stat-footer-text">Active client rules</div>
       </div>
 
       {/* Card 2: Groups */}
@@ -47,10 +46,9 @@ export const DashboardStatsCards: React.FC<DashboardStatsCardsProps> = ({
           </div>
         </div>
         <div className="stat-big-value">{stats.total_groups}</div>
-        <div className="stat-footer-text">Managed groups</div>
       </div>
 
-      {/* Card 3: Pending Draft */}
+      {/* Card 3: Pending Changes */}
       <div className="stat-card-box">
         <div className="stat-top-row">
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -60,16 +58,13 @@ export const DashboardStatsCards: React.FC<DashboardStatsCardsProps> = ({
               <line x1="16" y1="13" x2="8" y2="13" />
               <line x1="16" y1="17" x2="8" y2="17" />
             </svg>
-            <span className="stat-title-label">PENDING DRAFT</span>
+            <span className="stat-title-label">PENDING</span>
           </div>
         </div>
         <div className="stat-big-value">{stats.pending_changes}</div>
-        <div className="stat-footer-text">
-          {stats.pending_changes > 0 ? 'Unapplied changes' : 'Synced'}
-        </div>
       </div>
 
-      {/* Card 4: Config Version */}
+      {/* Card 4: Version */}
       <div className="stat-card-box">
         <div className="stat-top-row">
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -77,15 +72,10 @@ export const DashboardStatsCards: React.FC<DashboardStatsCardsProps> = ({
               <polyline points="16 18 22 12 16 6" />
               <polyline points="8 6 2 12 8 18" />
             </svg>
-            <span className="stat-title-label">CONFIG VERSION</span>
+            <span className="stat-title-label">VERSION</span>
           </div>
         </div>
         <div className="stat-big-value">v{stats.current_version ?? 1}</div>
-        <div className="stat-footer-text">
-          {stats.last_applied
-            ? `Applied ${new Date(stats.last_applied).toLocaleDateString('en-US')}`
-            : 'Live'}
-        </div>
       </div>
     </div>
   );

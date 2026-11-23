@@ -24,7 +24,7 @@ export const CacheDiagnosticsCard: React.FC<CacheDiagnosticsCardProps> = ({
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
             </svg>
-            Redis Caching Engine &amp; Performance
+            Cache Engine
           </h2>
           <p className="settings-section-desc">
             High-performance in-memory cache accelerating router cron polling and API queries to sub-millisecond speeds.
@@ -56,7 +56,7 @@ export const CacheDiagnosticsCard: React.FC<CacheDiagnosticsCardProps> = ({
           <div className="settings-row-control">
             <div className="gateway-pill" style={{ margin: 0 }}>
               <span style={{ fontWeight: 600 }}>
-                {cacheInfo?.engine === 'redis' ? 'Redis 7.0 (Active & Connected)' : 'In-Memory Cache (Active)'}
+                {cacheInfo?.engine === 'redis' ? 'Redis 7.0 (Connected)' : 'In-Memory Cache (Active)'}
               </span>
             </div>
           </div>
@@ -69,7 +69,7 @@ export const CacheDiagnosticsCard: React.FC<CacheDiagnosticsCardProps> = ({
           </div>
           <div className="settings-row-control">
             <span style={{ fontSize: '0.85rem', fontWeight: 600, fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>
-              {cacheInfo?.pingMs !== undefined ? `${cacheInfo.pingMs} ms (Sub-millisecond)` : '< 1 ms'}
+              {cacheInfo?.pingMs !== undefined ? `${cacheInfo.pingMs} ms` : '< 1 ms'}
             </span>
           </div>
         </div>
