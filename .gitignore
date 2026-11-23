@@ -32,7 +32,8 @@ yarn-error.log*
 /scripts/test_supa.js
 
 # env files (can opt-in for committing if needed)
-.env*
+.env
+.env.local
 
 # vercel
 .vercel
