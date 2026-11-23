@@ -5,6 +5,7 @@ import { DashboardStats, ActiveTab } from '@/lib/types';
 import { HistoryTelemetryGrid } from '../history/HistoryTelemetryGrid';
 import { HistoryLedgerList } from '../history/HistoryLedgerList';
 import { HistoryInspectorCard } from '../history/HistoryInspectorCard';
+import { RollbackModal } from '../modals/RollbackModal';
 
 interface HistoryViewProps {
   historyList: any[];
@@ -20,6 +21,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
   historyList,
   liveHistoryItem,
   stats,
+  onFetchHistory,
   onTabChange,
   onShowToast,
 }) => {
@@ -32,6 +34,29 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
   const [copiedHashId, setCopiedHashId] = useState<string | null>(null);
   const [copiedContentTab, setCopiedContentTab] = useState<string | null>(null);
   const [mobileActiveTab, setMobileActiveTab] = useState<'list' | 'inspector'>('list');
+  const [rollbackTargetItem, setRollbackTargetItem] = useState<any | null>(null);
+  const [isRollingBack, setIsRollingBack] = useState(false);
+
+  const handleConfirmRollback = async (version: number, reason: string) => {
+    setIsRollingBack(true);
+    try {
+      const res = await fetch('/api/config/rollback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ version, reason }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || `Rollback failed with status ${res.status}`);
+      }
+      onShowToast(`Successfully rolled back to configuration v${version}`);
+      if (onFetchHistory) {
+        onFetchHistory();
+      }
+    } finally {
+      setIsRollingBack(false);
+    }
+  };
 
   // Sync selected item if history changes and no selection exists
   React.useEffect(() => {
@@ -254,9 +279,20 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
             onCopyToClipboard={copyToClipboard}
             onDownloadFile={downloadHistoryFile}
             onBackToList={() => setMobileActiveTab('list')}
+            onOpenRollback={(item) => setRollbackTargetItem(item)}
           />
         </div>
       </div>
+
+      {/* Rollback Confirmation Modal */}
+      <RollbackModal
+        isOpen={Boolean(rollbackTargetItem)}
+        onClose={() => setRollbackTargetItem(null)}
+        targetVersion={rollbackTargetItem}
+        liveVersion={liveHistoryItem}
+        onConfirmRollback={handleConfirmRollback}
+        isRollingBack={isRollingBack}
+      />
     </div>
   );
 };

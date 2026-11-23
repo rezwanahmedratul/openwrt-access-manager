@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { getSessionFromRequest } from '@/lib/auth';
+import { getSessionFromRequest, verifyCsrf } from '@/lib/auth';
+import { hashPassword } from '@/lib/password';
 import { getMockState } from '@/lib/mock-store';
 import { getServiceSupabase } from '@/lib/supabase';
 import { Account } from '@/lib/types';
@@ -66,6 +67,10 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  if (!verifyCsrf(request)) {
+    return NextResponse.json({ error: 'Forbidden: CSRF check failed' }, { status: 403 });
+  }
+
   const session = getSessionFromRequest(request);
   if (!session || session.role !== 'admin') {
     return NextResponse.json({ error: 'Unauthorized: Only administrators can create subadmin accounts' }, { status: 403 });
@@ -89,6 +94,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Password must be at least 4 characters' }, { status: 400 });
     }
 
+    const hashedPassword = await hashPassword(cleanPassword);
+
     const isSupabaseConfigured = Boolean(
       process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_URL.startsWith('http')
     );
@@ -110,7 +117,7 @@ export async function POST(request: Request) {
           .from('accounts')
           .insert({
             username: cleanUsername,
-            password_hash: cleanPassword,
+            password_hash: hashedPassword,
             role: 'subadmin',
           })
           .select('id, username, role, created_at, updated_at')
@@ -133,7 +140,7 @@ export async function POST(request: Request) {
     const newAccount: Account = {
       id: 'acc-' + Date.now(),
       username: cleanUsername,
-      password_hash: cleanPassword,
+      password_hash: hashedPassword,
       role: 'subadmin',
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
@@ -158,6 +165,10 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
+  if (!verifyCsrf(request)) {
+    return NextResponse.json({ error: 'Forbidden: CSRF check failed' }, { status: 403 });
+  }
+
   const session = getSessionFromRequest(request);
   if (!session || session.role !== 'admin') {
     return NextResponse.json({ error: 'Unauthorized: Only administrators can delete subadmin accounts' }, { status: 403 });
@@ -206,6 +217,10 @@ export async function DELETE(request: Request) {
 }
 
 export async function PATCH(request: Request) {
+  if (!verifyCsrf(request)) {
+    return NextResponse.json({ error: 'Forbidden: CSRF check failed' }, { status: 403 });
+  }
+
   const session = getSessionFromRequest(request);
   if (!session) {
     return NextResponse.json({ error: 'Unauthorized: Session required' }, { status: 401 });
@@ -232,6 +247,8 @@ export async function PATCH(request: Request) {
     if (cleanPassword.length < 4) {
       return NextResponse.json({ error: 'Password must be at least 4 characters' }, { status: 400 });
     }
+
+    const hashedPassword = await hashPassword(cleanPassword);
 
     const isSupabaseConfigured = Boolean(
       process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_URL.startsWith('http')
@@ -261,7 +278,7 @@ export async function PATCH(request: Request) {
         const { error: updateError } = await supabase
           .from('accounts')
           .update({
-            password_hash: cleanPassword,
+            password_hash: hashedPassword,
             updated_at: new Date().toISOString(),
           })
           .eq('id', existing.id);
@@ -277,7 +294,7 @@ export async function PATCH(request: Request) {
           const updated = [...state.mockAccounts];
           updated[mockIdx] = {
             ...updated[mockIdx],
-            password_hash: cleanPassword,
+            password_hash: hashedPassword,
             updated_at: new Date().toISOString(),
           };
           state.setMockAccounts(updated);
@@ -311,7 +328,7 @@ export async function PATCH(request: Request) {
 
     updatedAccounts[accountIndex] = {
       ...targetAccount,
-      password_hash: cleanPassword,
+      password_hash: hashedPassword,
       updated_at: new Date().toISOString(),
     };
     state.setMockAccounts(updatedAccounts);

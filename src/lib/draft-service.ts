@@ -399,6 +399,8 @@ export interface DraftOperationItem {
   name?: string;
   mac_address?: string;
   group_ids?: string[];
+  schedule?: any;
+  temporary_access_until?: string | null;
 }
 
 export interface DraftValidationContext {
@@ -754,6 +756,8 @@ export function fastValidateAndPrepareChange(
             name: normalizedNameStr,
             mac_address: normalizedMacStr,
             group_ids: resolvedGroupIds,
+            schedule: item.schedule || null,
+            temporary_access_until: item.temporary_access_until || null,
           }
         : null,
   };

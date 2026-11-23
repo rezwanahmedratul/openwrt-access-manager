@@ -4,26 +4,39 @@ import { getMockState } from '@/lib/mock-store';
 import { generateFirewallConfig, generateEthersConfig, computeConfigHash, UserConfigInput } from '@/lib/config-generator';
 import { cacheGet, cacheSet } from '@/lib/cache';
 import { getMacAuthSettings } from '@/lib/mac-auth';
+import { authenticateRouter } from '@/lib/auth';
 
 const CONFIG_VERSION_CACHE_KEY = 'cache:config:version';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-function authenticateRouter(request: Request): boolean {
-  const authHeader = request.headers.get('authorization') || '';
-  const routerSecret = process.env.ROUTER_SECRET || 'openwrt-secret-token-change-in-production';
-  const expected = `Bearer ${routerSecret}`;
-  return authHeader === expected;
-}
-
 export async function GET(request: Request) {
-  if (!authenticateRouter(request)) {
+  const isAuth = await authenticateRouter(request);
+  if (!isAuth) {
     return NextResponse.json({ error: 'Unauthorized: Invalid router credentials' }, { status: 401 });
   }
 
-  // Record router heartbeat telemetry
-  await cacheSet('telemetry:router:last_seen', new Date().toISOString(), 86400 * 30);
+  const nowIso = new Date().toISOString();
+  // Record router heartbeat telemetry to cache and database
+  await cacheSet('telemetry:router:last_seen', nowIso, 86400 * 30);
+  try {
+    const isDbConfigured = Boolean(
+      process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_URL.startsWith('http')
+    );
+    if (isDbConfigured) {
+      const db = getServiceSupabase();
+      await db.from('router_telemetry').insert({
+        last_sync: nowIso,
+        created_at: nowIso,
+      });
+    } else {
+      const state = getMockState();
+      if (state.mockRouterTelemetry && state.mockRouterTelemetry.length > 0) {
+        state.mockRouterTelemetry[0].last_sync = nowIso;
+      }
+    }
+  } catch {}
 
   // Check MAC auth status and handle auto-expiration first.
   // If MAC auth was temporarily disabled and has now expired, getMacAuthSettings()

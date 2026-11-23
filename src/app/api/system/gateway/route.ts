@@ -16,8 +16,37 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Unauthorized: Session required' }, { status: 401 });
   }
 
-  const routerSecret = process.env.ROUTER_SECRET || 'openwrt-secret-token-change-in-production';
-  const routerLastSeen = await cacheGet<string>('telemetry:router:last_seen');
+  const isProduction = process.env.NODE_ENV === 'production';
+  const envSecret = process.env.ROUTER_SECRET;
+  const routerSecret = envSecret || (isProduction ? undefined : 'openwrt-secret-token-change-in-production');
+
+  const isSupabaseConfigured = Boolean(
+    process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_URL.startsWith('http')
+  );
+
+  let routerLastSeen: string | null = null;
+  if (isSupabaseConfigured) {
+    try {
+      const supabase = getServiceSupabase();
+      const { data: telem } = await supabase
+        .from('router_telemetry')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (telem) routerLastSeen = telem.last_sync || telem.created_at;
+    } catch {}
+  } else {
+    const state = getMockState();
+    if (state.mockRouterTelemetry.length > 0) {
+      routerLastSeen = state.mockRouterTelemetry[0].last_sync || state.mockRouterTelemetry[0].created_at;
+    }
+  }
+
+  if (!routerLastSeen) {
+    routerLastSeen = await cacheGet<string>('telemetry:router:last_seen');
+  }
+
   const url = new URL(request.url);
 
   return NextResponse.json({
@@ -29,6 +58,10 @@ export async function GET(request: Request) {
       version: '/api/config/version',
       firewall: '/api/config/firewall',
       ethers: '/api/config/ethers',
+      heartbeat: '/api/config/heartbeat',
+      status: '/api/config/status',
+      token: '/api/config/token',
+      rollback: '/api/config/rollback',
     },
     router_last_seen: routerLastSeen || null,
   });
@@ -81,7 +114,27 @@ export async function POST(request: Request) {
     }
 
     const latencyMs = Math.round(performance.now() - start);
-    const routerLastSeen = await cacheGet<string>('telemetry:router:last_seen');
+    let routerLastSeen: string | null = null;
+    if (isSupabaseConfigured) {
+      try {
+        const supabase = getServiceSupabase();
+        const { data: telem } = await supabase
+          .from('router_telemetry')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (telem) routerLastSeen = telem.last_sync || telem.created_at;
+      } catch {}
+    } else {
+      const state = getMockState();
+      if (state.mockRouterTelemetry.length > 0) {
+        routerLastSeen = state.mockRouterTelemetry[0].last_sync || state.mockRouterTelemetry[0].created_at;
+      }
+    }
+    if (!routerLastSeen) {
+      routerLastSeen = await cacheGet<string>('telemetry:router:last_seen');
+    }
 
     return NextResponse.json({
       healthy: true,

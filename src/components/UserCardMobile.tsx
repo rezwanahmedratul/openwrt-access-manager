@@ -79,6 +79,60 @@ export const UserCardMobile: React.FC<UserCardMobileProps> = ({
             </span>
           )}
 
+          {user.temporary_access_until && (
+            new Date(user.temporary_access_until).getTime() <= Date.now() ? (
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.2rem',
+                  fontSize: '0.64rem',
+                  fontWeight: 600,
+                  padding: '0.12rem 0.35rem',
+                  borderRadius: '9999px',
+                  backgroundColor: 'rgba(239, 68, 68, 0.12)',
+                  color: '#ef4444',
+                }}
+              >
+                Expired
+              </span>
+            ) : (
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.2rem',
+                  fontSize: '0.64rem',
+                  fontWeight: 600,
+                  padding: '0.12rem 0.35rem',
+                  borderRadius: '9999px',
+                  backgroundColor: 'rgba(245, 158, 11, 0.12)',
+                  color: '#f59e0b',
+                }}
+              >
+                Temp
+              </span>
+            )
+          )}
+
+          {user.schedule && user.schedule.enabled !== false && user.schedule.days?.length > 0 && (
+            <span
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.2rem',
+                fontSize: '0.64rem',
+                fontWeight: 600,
+                padding: '0.12rem 0.35rem',
+                borderRadius: '9999px',
+                backgroundColor: 'rgba(99, 102, 241, 0.12)',
+                color: '#6366f1',
+              }}
+            >
+              Scheduled
+            </span>
+          )}
+
           <span className="mobile-user-card-name" title={user.name}>
             {user.name}
           </span>

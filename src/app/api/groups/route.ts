@@ -2,8 +2,10 @@ import { NextResponse } from 'next/server';
 import { getServiceSupabase } from '@/lib/supabase';
 import { getMockState } from '@/lib/mock-store';
 import { Group } from '@/lib/types';
-import { getSessionFromRequest } from '@/lib/auth';
+import { requireAuth } from '@/lib/auth';
 import { cacheGet, cacheSet, cacheDelPrefix } from '@/lib/cache';
+import { logAudit, getClientIp } from '@/lib/audit';
+import { groupNameSchema } from '@/lib/validation';
 import {
   reassignGroupOnDeleteSupabase,
   reassignGroupOnDeleteMock,
@@ -25,61 +27,60 @@ async function invalidateGroupsAndUsersCache() {
 
 // GET all groups
 export async function GET(request: Request) {
-  const session = getSessionFromRequest(request);
-  if (!session) {
-    return NextResponse.json({ error: 'Unauthorized: Session required' }, { status: 401 });
-  }
+  try {
+    await requireAuth(request);
 
-  const cached = await cacheGet<Group[]>(GROUPS_CACHE_KEY);
-  if (cached) {
-    return NextResponse.json(
-      { groups: cached },
-      { headers: { 'X-Cache': 'HIT', 'Cache-Control': 'private, no-cache' } }
-    );
-  }
-
-  const supabase = getServiceSupabase();
-  const isSupabaseConfigured = Boolean(
-    process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_URL.startsWith('http')
-  );
-
-  if (isSupabaseConfigured) {
-    const { data, error } = await supabase.from('groups').select('*').order('name');
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+    const cached = await cacheGet<Group[]>(GROUPS_CACHE_KEY);
+    if (cached) {
+      return NextResponse.json(
+        { groups: cached },
+        { headers: { 'X-Cache': 'HIT', 'Cache-Control': 'private, no-cache' } }
+      );
     }
-    const groups = data || [];
-    await cacheSet(GROUPS_CACHE_KEY, groups, 60);
-    return NextResponse.json(
-      { groups },
-      { headers: { 'X-Cache': 'MISS', 'Cache-Control': 'private, no-cache' } }
+
+    const supabase = getServiceSupabase();
+    const isSupabaseConfigured = Boolean(
+      process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_URL.startsWith('http')
     );
-  } else {
-    const state = getMockState();
-    await cacheSet(GROUPS_CACHE_KEY, state.mockGroups, 60);
-    return NextResponse.json(
-      { groups: state.mockGroups },
-      { headers: { 'X-Cache': 'MISS', 'Cache-Control': 'private, no-cache' } }
-    );
+
+    if (isSupabaseConfigured) {
+      const { data, error } = await supabase.from('groups').select('*').order('name');
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+      const groups = data || [];
+      await cacheSet(GROUPS_CACHE_KEY, groups, 60);
+      return NextResponse.json(
+        { groups },
+        { headers: { 'X-Cache': 'MISS', 'Cache-Control': 'private, no-cache' } }
+      );
+    } else {
+      const state = getMockState();
+      await cacheSet(GROUPS_CACHE_KEY, state.mockGroups, 60);
+      return NextResponse.json(
+        { groups: state.mockGroups },
+        { headers: { 'X-Cache': 'MISS', 'Cache-Control': 'private, no-cache' } }
+      );
+    }
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message || 'Unauthorized' }, { status: err.status || 401 });
   }
 }
 
 // POST create group
 export async function POST(request: Request) {
   try {
-    const session = getSessionFromRequest(request);
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized: Session required' }, { status: 401 });
-    }
+    const session = await requireAuth(request);
 
     const body = await request.json();
     const { name, is_protected, is_no_internet } = body;
 
-    if (!name || typeof name !== 'string' || !name.trim()) {
-      return NextResponse.json({ error: 'Group name is required' }, { status: 400 });
+    const nameValidation = groupNameSchema.safeParse(name);
+    if (!nameValidation.success) {
+      return NextResponse.json({ error: nameValidation.error.issues[0]?.message || 'Invalid group name' }, { status: 400 });
     }
 
-    const trimmedName = name.trim();
+    const trimmedName = nameValidation.data;
     const shouldProtect = Boolean(is_protected);
     const shouldNoInternet = Boolean(is_no_internet);
 
@@ -87,7 +88,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'A group cannot be both Protected and No Internet.' }, { status: 400 });
     }
 
-    // Only admin can create protected or no internet groups
+    // Role check: Only admin can create protected or no internet groups
     if ((shouldProtect || shouldNoInternet) && session.role !== 'admin') {
       return NextResponse.json({ error: 'Only administrators can create protected or No Internet groups.' }, { status: 403 });
     }
@@ -119,6 +120,18 @@ export async function POST(request: Request) {
       }
 
       await invalidateGroupsAndUsersCache();
+
+      // Audit log
+      await logAudit({
+        actor_id: session.id,
+        actor_username: session.username,
+        action: 'GROUP_CREATE',
+        resource_type: 'group',
+        resource_id: data.id,
+        details: { name: trimmedName, is_protected: shouldProtect, is_no_internet: shouldNoInternet },
+        ip_address: getClientIp(request),
+      });
+
       return NextResponse.json({ success: true, group: data });
     } else {
       const state = getMockState();
@@ -140,26 +153,34 @@ export async function POST(request: Request) {
 
       state.setMockGroups([...state.mockGroups, newGroup]);
       await invalidateGroupsAndUsersCache();
+
+      await logAudit({
+        actor_id: session.id,
+        actor_username: session.username,
+        action: 'GROUP_CREATE',
+        resource_type: 'group',
+        resource_id: newGroup.id,
+        details: { name: trimmedName, is_protected: shouldProtect, is_no_internet: shouldNoInternet },
+        ip_address: getClientIp(request),
+      });
+
       return NextResponse.json({ success: true, group: newGroup });
     }
   } catch (err: any) {
-    return NextResponse.json({ error: err.message || 'Server error' }, { status: 500 });
+    return NextResponse.json({ error: err.message || 'Server error' }, { status: err.status || 500 });
   }
 }
 
 // DELETE group: Reassign all users from this group to 'Default' group
 export async function DELETE(request: Request) {
   try {
+    const session = await requireAuth(request);
+
     const { searchParams } = new URL(request.url);
     const groupId = searchParams.get('id');
 
     if (!groupId) {
       return NextResponse.json({ error: 'Group ID is required' }, { status: 400 });
-    }
-
-    const session = getSessionFromRequest(request);
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized: Session required' }, { status: 401 });
     }
 
     const supabase = getServiceSupabase();
@@ -179,6 +200,17 @@ export async function DELETE(request: Request) {
         return NextResponse.json({ error: result.error }, { status: result.status });
       }
       await invalidateGroupsAndUsersCache();
+
+      await logAudit({
+        actor_id: session.id,
+        actor_username: session.username,
+        action: 'GROUP_DELETE',
+        resource_type: 'group',
+        resource_id: groupId,
+        details: { group_name: targetGroup?.name, reassigned_to: result.defaultGroupName },
+        ip_address: getClientIp(request),
+      });
+
       return NextResponse.json({
         success: true,
         message: `Group deleted. Users successfully reassigned to "${result.defaultGroupName}".`,
@@ -195,23 +227,31 @@ export async function DELETE(request: Request) {
         return NextResponse.json({ error: result.error }, { status: result.status });
       }
       await invalidateGroupsAndUsersCache();
+
+      await logAudit({
+        actor_id: session.id,
+        actor_username: session.username,
+        action: 'GROUP_DELETE',
+        resource_type: 'group',
+        resource_id: groupId,
+        details: { group_name: targetGroup?.name, reassigned_to: result.defaultGroupName },
+        ip_address: getClientIp(request),
+      });
+
       return NextResponse.json({
         success: true,
         message: `Group deleted. Users successfully reassigned to "${result.defaultGroupName}".`,
       });
     }
   } catch (err: any) {
-    return NextResponse.json({ error: err.message || 'Server error' }, { status: 500 });
+    return NextResponse.json({ error: err.message || 'Server error' }, { status: err.status || 500 });
   }
 }
 
 // PATCH toggle group protection, no internet status, or rename
 export async function PATCH(request: Request) {
   try {
-    const session = getSessionFromRequest(request);
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized: Session required' }, { status: 401 });
-    }
+    const session = await requireAuth(request);
 
     const body = await request.json();
     const { id, is_protected, is_no_internet, name, conflict_action } = body;
@@ -293,6 +333,17 @@ export async function PATCH(request: Request) {
 
       if (error) return NextResponse.json({ error: error.message }, { status: 500 });
       await invalidateGroupsAndUsersCache();
+
+      await logAudit({
+        actor_id: session.id,
+        actor_username: session.username,
+        action: 'GROUP_UPDATE',
+        resource_type: 'group',
+        resource_id: id,
+        details: updateData,
+        ip_address: getClientIp(request),
+      });
+
       return NextResponse.json({ success: true, group: data });
     } else {
       // Mock mode
@@ -342,9 +393,24 @@ export async function PATCH(request: Request) {
 
       state.setMockGroups(state.mockGroups.map((g) => (g.id === id ? updatedGroup : g)));
       await invalidateGroupsAndUsersCache();
+
+      await logAudit({
+        actor_id: session.id,
+        actor_username: session.username,
+        action: 'GROUP_UPDATE',
+        resource_type: 'group',
+        resource_id: id,
+        details: {
+          is_protected: updatedGroup.is_protected,
+          is_no_internet: updatedGroup.is_no_internet,
+          name: updatedGroup.name,
+        },
+        ip_address: getClientIp(request),
+      });
+
       return NextResponse.json({ success: true, group: updatedGroup });
     }
   } catch (err: any) {
-    return NextResponse.json({ error: err.message || 'Server error' }, { status: 500 });
+    return NextResponse.json({ error: err.message || 'Server error' }, { status: err.status || 500 });
   }
 }

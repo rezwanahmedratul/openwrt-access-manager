@@ -232,6 +232,52 @@ export const AccountView: React.FC<AccountViewProps> = ({
               </tbody>
             </table>
           </div>
+
+          {/* Audit Logs Section (Admin View) */}
+          <div className="account-info-box" style={{ marginTop: '1.75rem', padding: '1.25rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '0.75rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                <div
+                  style={{
+                    width: '32px',
+                    height: '32px',
+                    borderRadius: '6px',
+                    background: 'rgba(59, 130, 246, 0.1)',
+                    color: '#3b82f6',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="12" y1="16" x2="12" y2="12" />
+                    <line x1="12" y1="8" x2="12.01" y2="8" />
+                  </svg>
+                </div>
+                <div>
+                  <h4 style={{ margin: 0, fontSize: '0.98rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                    Security &amp; Compliance Audit Logs
+                  </h4>
+                  <p style={{ margin: '0.15rem 0 0', fontSize: '0.76rem', color: 'var(--text-secondary)' }}>
+                    Query immutable records of configuration rollbacks, device changes, and credential access.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={() => onTabChange('audit')}
+                style={{ fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+              >
+                <span>Launch Audit Viewer</span>
+                <span style={{ fontSize: '0.9rem' }}>→</span>
+              </button>
+            </div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', background: 'var(--bg-app)', padding: '0.75rem', borderRadius: '6px', border: '1px solid var(--border-subtle)' }}>
+              Audit events capture actor ID, client IP, before/after parameters, and cryptographic timestamps to ensure accountability and detect tampering.
+            </div>
+          </div>
         </div>
       ) : (
         <div className="horizontal-add-card" style={{ padding: '1.5rem' }}>

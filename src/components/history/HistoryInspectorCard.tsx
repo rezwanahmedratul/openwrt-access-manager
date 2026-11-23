@@ -3,6 +3,7 @@
 import React from 'react';
 import { DashboardStats } from '@/lib/types';
 import { ConfigDiffViewer } from './ConfigDiffViewer';
+import { renderDeploymentStatusBadge } from './HistoryLedgerList';
 
 interface HistoryInspectorCardProps {
   selectedHistoryItem: any;
@@ -15,6 +16,7 @@ interface HistoryInspectorCardProps {
   onCopyToClipboard: (text: string, id: string, isContentTab?: boolean) => void;
   onDownloadFile: (content: string, filename: string) => void;
   onBackToList?: () => void;
+  onOpenRollback?: (item: any) => void;
 }
 
 export const HistoryInspectorCard: React.FC<HistoryInspectorCardProps> = ({
@@ -28,6 +30,7 @@ export const HistoryInspectorCard: React.FC<HistoryInspectorCardProps> = ({
   onCopyToClipboard,
   onDownloadFile,
   onBackToList,
+  onOpenRollback,
 }) => {
   return (
     <div className="history-inspector-card">
@@ -55,15 +58,44 @@ export const HistoryInspectorCard: React.FC<HistoryInspectorCardProps> = ({
             )}
 
             <div className="history-inspector-header-top">
-              <div className="history-inspector-title">
+              <div className="history-inspector-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                 <span>Release v{selectedHistoryItem.version}</span>
                 {selectedHistoryItem.is_current ? (
                   <span className="history-live-pill">Live Active</span>
                 ) : (
                   <span className="history-archived-pill">Archived Version</span>
                 )}
+                {renderDeploymentStatusBadge(selectedHistoryItem.deployment_status, Boolean(selectedHistoryItem.rollback_from_version))}
+                {selectedHistoryItem.rollback_from_version && (
+                  <span style={{ fontSize: '0.72rem', color: '#a855f7', fontWeight: 600 }}>
+                    (Rolled back from v{selectedHistoryItem.rollback_from_version})
+                  </span>
+                )}
               </div>
               <div className="history-inspector-actions-row">
+                {!selectedHistoryItem.is_current && onOpenRollback && (
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => onOpenRollback(selectedHistoryItem)}
+                    title="Rollback configuration to this version"
+                    style={{
+                      fontSize: '0.75rem',
+                      padding: '0.35rem 0.65rem',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.35rem',
+                      borderColor: 'rgba(239, 68, 68, 0.4)',
+                      color: '#ef4444',
+                    }}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <polyline points="1 4 1 10 7 10" />
+                      <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+                    </svg>
+                    <span>Rollback to v{selectedHistoryItem.version}</span>
+                  </button>
+                )}
                 <button
                   type="button"
                   className="btn btn-secondary btn-sm"
@@ -116,6 +148,16 @@ export const HistoryInspectorCard: React.FC<HistoryInspectorCardProps> = ({
               <div>
                 <strong>Devices:</strong> {selectedHistoryItem.user_count} rules compiled
               </div>
+              {selectedHistoryItem.author_name && (
+                <div>
+                  <strong>Author:</strong> {selectedHistoryItem.author_name}
+                </div>
+              )}
+              {selectedHistoryItem.change_description && (
+                <div style={{ maxWidth: '300px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={selectedHistoryItem.change_description}>
+                  <strong>Description:</strong> {selectedHistoryItem.change_description}
+                </div>
+              )}
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', minWidth: 0 }}>
                 <strong>SHA-256:</strong>
                 <span className="history-hash-chip" style={{ wordBreak: 'break-all' }}>
@@ -242,7 +284,7 @@ export const HistoryInspectorCard: React.FC<HistoryInspectorCardProps> = ({
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                   {/* Summary Banner */}
-                  <div className="history-metadata-item" style={{ background: 'var(--bg-app)' }}>
+                  <div className="history-metadata-item" style={{ background: 'var(--bg-app)', flexWrap: 'wrap', gap: '0.5rem' }}>
                     <div>
                       <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>Comparing:</span>{' '}
                       <span>v{selectedHistoryItem.version} (Archive)</span> →{' '}
@@ -261,6 +303,7 @@ export const HistoryInspectorCard: React.FC<HistoryInspectorCardProps> = ({
                     <ConfigDiffViewer
                       oldText={selectedHistoryItem.firewall_content || ''}
                       newText={liveHistoryItem?.firewall_content || ''}
+                      diff={selectedHistoryItem.metadata?.diff || null}
                     />
                   </div>
                 </div>
@@ -280,12 +323,26 @@ export const HistoryInspectorCard: React.FC<HistoryInspectorCardProps> = ({
               </div>
               <div className="history-metadata-item">
                 <span style={{ color: 'var(--text-secondary)' }}>Deployment Status</span>
-                {selectedHistoryItem.is_current ? (
-                  <span className="history-live-pill">Active on Gateway</span>
-                ) : (
-                  <span className="history-archived-pill">Archived / Superseded</span>
-                )}
+                {renderDeploymentStatusBadge(selectedHistoryItem.deployment_status, Boolean(selectedHistoryItem.rollback_from_version))}
               </div>
+              {selectedHistoryItem.change_description && (
+                <div className="history-metadata-item">
+                  <span style={{ color: 'var(--text-secondary)' }}>Change Description</span>
+                  <span style={{ fontWeight: 600 }}>{selectedHistoryItem.change_description}</span>
+                </div>
+              )}
+              {selectedHistoryItem.author_name && (
+                <div className="history-metadata-item">
+                  <span style={{ color: 'var(--text-secondary)' }}>Author / Initiator</span>
+                  <span>{selectedHistoryItem.author_name}</span>
+                </div>
+              )}
+              {selectedHistoryItem.rollback_from_version && (
+                <div className="history-metadata-item">
+                  <span style={{ color: 'var(--text-secondary)' }}>Rollback Source</span>
+                  <span style={{ color: '#a855f7', fontWeight: 600 }}>Restored from v{selectedHistoryItem.rollback_from_version}</span>
+                </div>
+              )}
               <div className="history-metadata-item">
                 <span style={{ color: 'var(--text-secondary)' }}>Timestamp Generated</span>
                 <span>{new Date(selectedHistoryItem.created_at).toISOString()}</span>

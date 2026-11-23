@@ -1,28 +1,18 @@
+import { NextResponse } from 'next/server';
 import { getServiceSupabase } from '@/lib/supabase';
 import { generateEthersConfig } from '@/lib/config-generator';
 import { getMockState } from '@/lib/mock-store';
 import { cacheGet, cacheSet } from '@/lib/cache';
+import { authenticateRouter } from '@/lib/auth';
 
 const ETHERS_CACHE_KEY = 'cache:config:ethers';
-
-import { NextResponse } from 'next/server';
-import { getSessionFromRequest } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-function authenticateRouter(request: Request): boolean {
-  // Allow authenticated session users (Admin & Subadmin) to preview/download configs
-  const session = getSessionFromRequest(request);
-  if (session) return true;
-
-  const authHeader = request.headers.get('authorization') || '';
-  const routerSecret = process.env.ROUTER_SECRET || 'openwrt-secret-token-change-in-production';
-  return authHeader === `Bearer ${routerSecret}`;
-}
-
 export async function GET(request: Request) {
-  if (!authenticateRouter(request)) {
+  const isAuth = await authenticateRouter(request);
+  if (!isAuth) {
     return NextResponse.json({ error: 'Unauthorized: Invalid router credentials or session required' }, { status: 401 });
   }
 

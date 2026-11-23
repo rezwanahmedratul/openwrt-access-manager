@@ -98,6 +98,12 @@ export async function cacheGet<T = any>(key: string): Promise<T | null> {
     }
   }
 
+  // On Vercel serverless without Redis, eliminate in-memory dependencies that cause stale state across lambdas
+  // Supabase remains the single source of truth
+  if (process.env.VERCEL && !isRedisAvailable) {
+    return null;
+  }
+
   // Memory fallback
   const entry = memoryStore.get(key);
   if (entry) {
@@ -121,11 +127,13 @@ export async function cacheGet<T = any>(key: string): Promise<T | null> {
 export async function cacheSet<T = any>(key: string, value: T, ttlSeconds: number = 60): Promise<void> {
   const serialized = JSON.stringify(value);
 
-  // Save to memory store first for immediate local availability
-  memoryStore.set(key, {
-    value: serialized,
-    expiresAt: Date.now() + ttlSeconds * 1000,
-  });
+  // On Vercel serverless without Redis, do not store cross-request state in-memory
+  if (!process.env.VERCEL || isRedisAvailable) {
+    memoryStore.set(key, {
+      value: serialized,
+      expiresAt: Date.now() + ttlSeconds * 1000,
+    });
+  }
 
   const client = getRedisClient();
   if (client && isRedisAvailable) {

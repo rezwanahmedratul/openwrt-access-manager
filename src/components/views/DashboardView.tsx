@@ -5,6 +5,7 @@ import { DashboardStats, Group, SessionUser, UserViewModel, ActiveTab } from '@/
 import { QuickAddBar } from '../QuickAddBar';
 import { DashboardStatsCards } from '../dashboard/DashboardStatsCards';
 import { DashboardMacAuthCard } from '../dashboard/DashboardMacAuthCard';
+import { RouterHealthCard } from '../dashboard/RouterHealthCard';
 import { DashboardTableCard } from '../dashboard/DashboardTableCard';
 
 interface DashboardViewProps {
@@ -157,6 +158,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         formatDateTime={formatDateTime}
         isUpdatingMacAuth={isUpdatingMacAuth}
         onToggleMacAuthClick={onToggleMacAuthClick}
+      />
+
+      {/* Router Health & Telemetry Status Card */}
+      <RouterHealthCard
+        stats={stats}
+        telemetry={stats.router_telemetry}
+        onRefresh={onRefreshData}
       />
 
       {/* Statistics Cards Row */}

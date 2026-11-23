@@ -1,28 +1,55 @@
 import { NextResponse } from 'next/server';
 import { getServiceSupabase } from '@/lib/supabase';
-import { generateFirewallConfig, generateEthersConfig, computeConfigHash, UserConfigInput } from '@/lib/config-generator';
+import { generateFirewallConfig, generateEthersConfig, computeConfigHash, computeConfigDiff, UserConfigInput } from '@/lib/config-generator';
 import { getMockState } from '@/lib/mock-store';
 import { cacheDelPrefix } from '@/lib/cache';
 import { getMacAuthSettings } from '@/lib/mac-auth';
-import { getSessionFromRequest } from '@/lib/auth';
+import { requireAuth } from '@/lib/auth';
+import { logAudit, getClientIp } from '@/lib/audit';
+import { Configuration } from '@/lib/types';
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export async function POST(request: Request) {
-  const session = getSessionFromRequest(request);
-  if (!session) {
-    return NextResponse.json({ error: 'Unauthorized: Session required' }, { status: 401 });
-  }
+  try {
+    const session = await requireAuth(request);
 
-  const supabase = getServiceSupabase();
-  const isSupabaseConfigured = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_URL.startsWith('http'));
-
-  if (isSupabaseConfigured) {
+    let body: any = {};
     try {
-      const { data: userData } = await supabase
-        .from('users')
-        .select(`
-          id, name, mac_address, created_at, updated_at,
-          user_groups ( group_id )
-        `);
+      body = await request.json();
+    } catch {
+      body = {};
+    }
+
+    const { expected_version, change_description } = body || {};
+
+    const supabase = getServiceSupabase();
+    const isSupabaseConfigured = Boolean(
+      process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_URL.startsWith('http')
+    );
+
+    if (isSupabaseConfigured) {
+      // 1. Fetch current version for optimistic concurrency control
+      const { data: lastConfig } = await supabase
+        .from('configurations')
+        .select('*')
+        .order('version', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      const currentVersion = lastConfig?.version || 0;
+
+      // Optimistic concurrency check
+      if (expected_version !== undefined && expected_version !== null && expected_version !== currentVersion) {
+        return NextResponse.json(
+          {
+            error: `Configuration conflict: expected version ${expected_version}, but current version is ${currentVersion}.`,
+            current_version: currentVersion,
+          },
+          { status: 409 }
+        );
+      }
 
       const { data: changes } = await supabase
         .from('draft_changes')
@@ -40,6 +67,8 @@ export async function POST(request: Request) {
             .insert({
               name: change.user_data.name,
               mac_address: change.user_data.mac_address,
+              schedule: change.user_data.schedule || null,
+              temporary_access_until: change.user_data.temporary_access_until || null,
             })
             .select()
             .single();
@@ -62,13 +91,22 @@ export async function POST(request: Request) {
             await supabase.from('user_groups').insert(junctionRows);
           }
         } else if (change.operation === 'MODIFY' && change.user_id && change.user_data) {
+          const updatePayload: any = {
+            name: change.user_data.name,
+            mac_address: change.user_data.mac_address,
+            updated_at: new Date().toISOString(),
+          };
+
+          if (change.user_data.schedule !== undefined) {
+            updatePayload.schedule = change.user_data.schedule;
+          }
+          if (change.user_data.temporary_access_until !== undefined) {
+            updatePayload.temporary_access_until = change.user_data.temporary_access_until;
+          }
+
           await supabase
             .from('users')
-            .update({
-              name: change.user_data.name,
-              mac_address: change.user_data.mac_address,
-              updated_at: new Date().toISOString(),
-            })
+            .update(updatePayload)
             .eq('id', change.user_id);
 
           await supabase.from('user_groups').delete().eq('user_id', change.user_id);
@@ -98,6 +136,8 @@ export async function POST(request: Request) {
         .select(`
           name,
           mac_address,
+          schedule,
+          temporary_access_until,
           user_groups (
             groups (
               is_no_internet
@@ -119,16 +159,17 @@ export async function POST(request: Request) {
       const ethersContent = generateEthersConfig(finalUsers);
       const hash = computeConfigHash(firewallContent, ethersContent);
 
-      const { data: lastConfig } = await supabase
-        .from('configurations')
-        .select('version')
-        .order('version', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+      const nextVersion = currentVersion + 1;
 
-      const nextVersion = (lastConfig?.version || 0) + 1;
+      // Calculate configuration difference snapshot
+      const diffSnapshot = computeConfigDiff(
+        lastConfig || {},
+        { firewall_content: firewallContent, ethers_content: ethersContent, users: finalUsers }
+      );
 
       await supabase.from('configurations').update({ is_current: false }).eq('is_current', true);
+
+      const desc = change_description || `Applied ${changes.length} pending draft changes`;
 
       const { error: configError } = await supabase
         .from('configurations')
@@ -139,9 +180,14 @@ export async function POST(request: Request) {
           firewall_content: firewallContent,
           ethers_content: ethersContent,
           is_current: true,
+          deployment_status: 'pending',
+          change_description: desc,
+          author_id: session.id,
+          author_name: session.username,
           metadata: {
             applied_at: new Date().toISOString(),
             applied_changes_count: changes.length,
+            diff_snapshot: diffSnapshot,
           },
         });
 
@@ -152,95 +198,182 @@ export async function POST(request: Request) {
       // Purge all Redis/memory caches so routers and clients receive fresh configuration immediately
       await cacheDelPrefix('cache:');
 
+      // Record audit log
+      await logAudit({
+        actor_id: session.id,
+        actor_username: session.username,
+        action: 'CONFIG_APPLY',
+        resource_type: 'configuration',
+        resource_id: `v${nextVersion}`,
+        details: {
+          version: nextVersion,
+          user_count: finalUsers.length,
+          applied_changes_count: changes.length,
+          diff_summary: {
+            added: diffSnapshot.added_devices?.length || 0,
+            removed: diffSnapshot.removed_devices?.length || 0,
+            modified: diffSnapshot.modified_devices?.length || 0,
+          },
+        },
+        ip_address: getClientIp(request),
+      });
+
       return NextResponse.json({
         success: true,
         version: nextVersion,
         hash,
         user_count: finalUsers.length,
+        deployment_status: 'pending',
+        diff: diffSnapshot,
         message: `Version ${nextVersion} published successfully`,
       });
-    } catch (err: any) {
-      console.error('Apply error:', err);
-      return NextResponse.json({ error: err.message || 'Failed to apply configuration' }, { status: 500 });
-    }
-  } else {
-    const state = getMockState();
-    if (state.mockDraftChanges.length === 0) {
-      return NextResponse.json({ error: 'No pending changes to apply' }, { status: 400 });
-    }
+    } else {
+      const state = getMockState();
 
-    let defaultGroup = state.mockGroups.find((g) => g.name.toLowerCase() === 'default');
-    if (!defaultGroup) {
-      defaultGroup = { id: 'g-default', name: 'Default', created_at: '', updated_at: '' };
-      state.setMockGroups([defaultGroup, ...state.mockGroups]);
-    }
-
-    let updatedUsers = [...state.mockUsers];
-
-    for (const change of state.mockDraftChanges) {
-      if (change.operation === 'ADD' && change.user_data) {
-        let assignedGroups = state.mockGroups.filter((g) => change.user_data?.group_ids?.includes(g.id));
-        if (assignedGroups.length === 0 && defaultGroup) {
-          assignedGroups = [defaultGroup];
-        }
-        updatedUsers.push({
-          id: 'user-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5),
-          name: change.user_data.name,
-          mac_address: change.user_data.mac_address,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          groups: assignedGroups,
-        });
-      } else if (change.operation === 'MODIFY' && change.user_id && change.user_data) {
-        let assignedGroups = state.mockGroups.filter((g) => change.user_data?.group_ids?.includes(g.id));
-        if (assignedGroups.length === 0 && defaultGroup) {
-          assignedGroups = [defaultGroup];
-        }
-        updatedUsers = updatedUsers.map((u) => {
-          if (u.id === change.user_id) {
-            return {
-              ...u,
-              name: change.user_data?.name || u.name,
-              mac_address: change.user_data?.mac_address || u.mac_address,
-              groups: assignedGroups,
-              updated_at: new Date().toISOString(),
-            };
-          }
-          return u;
-        });
-      } else if (change.operation === 'DELETE' && change.user_id) {
-        updatedUsers = updatedUsers.filter((u) => u.id !== change.user_id);
+      if (expected_version !== undefined && expected_version !== null && expected_version !== state.mockVersion) {
+        return NextResponse.json(
+          {
+            error: `Configuration conflict: expected version ${expected_version}, but current version is ${state.mockVersion}.`,
+            current_version: state.mockVersion,
+          },
+          { status: 409 }
+        );
       }
-    }
 
-    const nextVer = state.mockVersion + 1;
-    const finalUsersForConfig: UserConfigInput[] = updatedUsers.map((u) => {
-      const uGroups = u.groups.map((ug) => state.mockGroups.find((mg) => mg.id === ug.id) || ug);
-      return {
-        name: u.name,
-        mac_address: u.mac_address,
-        is_no_internet: Boolean(uGroups.some((g) => g.is_no_internet)),
+      if (state.mockDraftChanges.length === 0) {
+        return NextResponse.json({ error: 'No pending changes to apply' }, { status: 400 });
+      }
+
+      let defaultGroup = state.mockGroups.find((g) => g.name.toLowerCase() === 'default');
+      if (!defaultGroup) {
+        defaultGroup = { id: 'g-default', name: 'Default', created_at: '', updated_at: '' };
+        state.setMockGroups([defaultGroup, ...state.mockGroups]);
+      }
+
+      let updatedUsers = [...state.mockUsers];
+
+      for (const change of state.mockDraftChanges) {
+        if (change.operation === 'ADD' && change.user_data) {
+          let assignedGroups = state.mockGroups.filter((g) => change.user_data?.group_ids?.includes(g.id));
+          if (assignedGroups.length === 0 && defaultGroup) {
+            assignedGroups = [defaultGroup];
+          }
+          updatedUsers.push({
+            id: 'user-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5),
+            name: change.user_data.name,
+            mac_address: change.user_data.mac_address,
+            schedule: change.user_data.schedule || null,
+            temporary_access_until: change.user_data.temporary_access_until || null,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            groups: assignedGroups,
+          });
+        } else if (change.operation === 'MODIFY' && change.user_id && change.user_data) {
+          let assignedGroups = state.mockGroups.filter((g) => change.user_data?.group_ids?.includes(g.id));
+          if (assignedGroups.length === 0 && defaultGroup) {
+            assignedGroups = [defaultGroup];
+          }
+          updatedUsers = updatedUsers.map((u) => {
+            if (u.id === change.user_id) {
+              return {
+                ...u,
+                name: change.user_data?.name || u.name,
+                mac_address: change.user_data?.mac_address || u.mac_address,
+                schedule: change.user_data?.schedule !== undefined ? change.user_data.schedule : u.schedule,
+                temporary_access_until: change.user_data?.temporary_access_until !== undefined ? change.user_data.temporary_access_until : u.temporary_access_until,
+                groups: assignedGroups,
+                updated_at: new Date().toISOString(),
+              };
+            }
+            return u;
+          });
+        } else if (change.operation === 'DELETE' && change.user_id) {
+          updatedUsers = updatedUsers.filter((u) => u.id !== change.user_id);
+        }
+      }
+
+      const nextVer = state.mockVersion + 1;
+      const finalUsersForConfig: UserConfigInput[] = updatedUsers.map((u) => {
+        const uGroups = u.groups.map((ug) => state.mockGroups.find((mg) => mg.id === ug.id) || ug);
+        return {
+          name: u.name,
+          mac_address: u.mac_address,
+          is_no_internet: Boolean(uGroups.some((g) => g.is_no_internet)),
+        };
+      });
+      const macAuth = await getMacAuthSettings();
+      const firewall = generateFirewallConfig(finalUsersForConfig, macAuth.enabled);
+      const ethers = generateEthersConfig(updatedUsers);
+      const hash = computeConfigHash(firewall, ethers);
+
+      const lastConfig = state.mockConfigurations.find((c) => c.is_current) || state.mockConfigurations[0];
+      const diffSnapshot = computeConfigDiff(
+        lastConfig || {},
+        { firewall_content: firewall, ethers_content: ethers, users: updatedUsers }
+      );
+
+      const desc = change_description || `Applied ${state.mockDraftChanges.length} pending draft changes`;
+
+      const newConfigRecord: Configuration = {
+        id: `config-v${nextVer}`,
+        version: nextVer,
+        hash,
+        user_count: updatedUsers.length,
+        firewall_content: firewall,
+        ethers_content: ethers,
+        is_current: true,
+        deployment_status: 'pending',
+        change_description: desc,
+        author_id: session.id,
+        author_name: session.username,
+        metadata: {
+          applied_at: new Date().toISOString(),
+          applied_changes_count: state.mockDraftChanges.length,
+          diff_snapshot: diffSnapshot,
+        },
+        created_at: new Date().toISOString(),
       };
-    });
-    const macAuth = await getMacAuthSettings();
-    const firewall = generateFirewallConfig(finalUsersForConfig, macAuth.enabled);
-    const ethers = generateEthersConfig(updatedUsers);
-    const hash = computeConfigHash(firewall, ethers);
 
-    state.setMockUsers(updatedUsers);
-    state.setMockDraftChanges([]);
-    state.setMockVersion(nextVer);
-    state.setMockLastApplied(new Date().toISOString());
+      state.setMockUsers(updatedUsers);
+      state.setMockDraftChanges([]);
+      state.setMockVersion(nextVer);
+      state.setMockLastApplied(new Date().toISOString());
+      state.setMockConfigurations([newConfigRecord, ...state.mockConfigurations.map((c) => ({ ...c, is_current: false }))]);
 
-    // Purge cache
-    await cacheDelPrefix('cache:');
+      // Purge cache
+      await cacheDelPrefix('cache:');
 
-    return NextResponse.json({
-      success: true,
-      version: nextVer,
-      hash,
-      user_count: updatedUsers.length,
-      message: `Version ${nextVer} published successfully`,
-    });
+      // Record audit log
+      await logAudit({
+        actor_id: session.id,
+        actor_username: session.username,
+        action: 'CONFIG_APPLY',
+        resource_type: 'configuration',
+        resource_id: `v${nextVer}`,
+        details: {
+          version: nextVer,
+          user_count: updatedUsers.length,
+          diff_summary: {
+            added: diffSnapshot.added_devices?.length || 0,
+            removed: diffSnapshot.removed_devices?.length || 0,
+            modified: diffSnapshot.modified_devices?.length || 0,
+          },
+        },
+        ip_address: getClientIp(request),
+      });
+
+      return NextResponse.json({
+        success: true,
+        version: nextVer,
+        hash,
+        user_count: updatedUsers.length,
+        deployment_status: 'pending',
+        diff: diffSnapshot,
+        message: `Version ${nextVer} published successfully`,
+      });
+    }
+  } catch (err: any) {
+    console.error('Apply error:', err);
+    return NextResponse.json({ error: err.message || 'Failed to apply configuration' }, { status: err.status || 500 });
   }
 }

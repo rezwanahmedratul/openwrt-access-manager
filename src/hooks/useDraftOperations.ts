@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { UserViewModel, Group } from '@/lib/types';
+import { UserViewModel, Group, DeviceSchedule } from '@/lib/types';
 import { normalizeName } from '@/lib/normalize-name';
 import { normalizeMac } from '@/lib/normalize-mac';
 
@@ -26,6 +26,8 @@ export function useDraftOperations({
   const [formName, setFormName] = useState('');
   const [formMac, setFormMac] = useState('');
   const [formGroupIds, setFormGroupIds] = useState<string[]>([]);
+  const [formSchedule, setFormSchedule] = useState<DeviceSchedule | null>(null);
+  const [formTemporaryAccessUntil, setFormTemporaryAccessUntil] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
 
   // Duplicate checks against other existing users
@@ -65,6 +67,8 @@ export function useDraftOperations({
     setFormName(user.name);
     setFormMac(user.mac_address);
     setFormGroupIds(user.groups.map((g) => g.id));
+    setFormSchedule(user.schedule || null);
+    setFormTemporaryAccessUntil(user.temporary_access_until || null);
     setFormError(null);
   };
 
@@ -106,12 +110,14 @@ export function useDraftOperations({
     }
 
     try {
-      const payload = {
+      const payload: any = {
         operation: 'MODIFY',
         user_id: editingUserId,
         name: normName.normalized,
         mac_address: normMac.normalized,
         group_ids: finalGroupIds,
+        schedule: formSchedule,
+        temporary_access_until: formTemporaryAccessUntil,
       };
 
       const res = await fetch('/api/draft', {
@@ -226,6 +232,10 @@ export function useDraftOperations({
     setFormMac,
     formGroupIds,
     setFormGroupIds,
+    formSchedule,
+    setFormSchedule,
+    formTemporaryAccessUntil,
+    setFormTemporaryAccessUntil,
     formError,
     setFormError,
     duplicateMacUser,

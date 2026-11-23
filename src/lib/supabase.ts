@@ -23,6 +23,11 @@ const dummyKey = 'placeholder-key';
 let cachedPublicSupabase: SupabaseClient | null = null;
 let cachedServiceSupabase: SupabaseClient | null = null;
 
+export function isSupabaseConfigured(): boolean {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  return Boolean(url && url.startsWith('http') && !url.includes('placeholder.supabase.co'));
+}
+
 export function getPublicSupabase(): SupabaseClient {
   if (cachedPublicSupabase) {
     return cachedPublicSupabase;

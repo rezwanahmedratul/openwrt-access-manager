@@ -11,6 +11,7 @@ import { UsersView } from '@/components/views/UsersView';
 import { GroupsView } from '@/components/views/GroupsView';
 import { AccountView } from '@/components/views/AccountView';
 import { HistoryView } from '@/components/views/HistoryView';
+import { AuditLogsView } from '@/components/views/AuditLogsView';
 import { SettingsView } from '@/components/views/SettingsView';
 import { EditUserModal } from '@/components/modals/EditUserModal';
 import { HistoryQuickModal } from '@/components/modals/HistoryQuickModal';
@@ -375,6 +376,14 @@ export default function DashboardPage() {
             />
           )}
 
+          {activeTab === 'audit' && (
+            <AuditLogsView
+              currentUser={currentUser}
+              onTabChange={handleTabChange}
+              onShowToast={showToast}
+            />
+          )}
+
           {activeTab === 'settings' && (
             <SettingsView
               stats={stats}
@@ -433,6 +442,10 @@ export default function DashboardPage() {
         setFormMac={draft.setFormMac}
         formGroupIds={draft.formGroupIds}
         setFormGroupIds={draft.setFormGroupIds}
+        formSchedule={draft.formSchedule}
+        setFormSchedule={draft.setFormSchedule}
+        formTemporaryAccessUntil={draft.formTemporaryAccessUntil}
+        setFormTemporaryAccessUntil={draft.setFormTemporaryAccessUntil}
         formError={draft.formError}
         groups={groups}
         currentUser={currentUser}

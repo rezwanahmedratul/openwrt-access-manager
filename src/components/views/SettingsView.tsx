@@ -140,6 +140,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         setShowSecretToken={setShowSecretToken}
         tokenCopied={tokenCopied}
         onCopyText={onCopyText}
+        currentUser={currentUser}
+        onShowToast={onShowToast}
       />
 
       {/* SECTION 5: Redis In-Memory Caching & Performance Engine */}
